@@ -1,0 +1,40 @@
+<div class="mt-2 p-3 bg-brand-50 border border-brand-100 rounded-lg text-xs">
+    <div class="flex items-center justify-between font-medium text-brand-900 mb-1">
+        <span>Existing Customer: <strong>{{ customer.name }}</strong></span>
+        {% if has_active_warranty %}
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+            Active Warranty
+        </span>
+        {% endif %}
+    </div>
+
+    <!-- OOB Swap to fill customer name input -->
+    <input id="customer_name"
+           name="customer_name"
+           value="{{ customer.name }}"
+           hx-swap-oob="true"
+           required
+           class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 text-sm">
+
+    {% if past_tickets %}
+    <div class="mt-2 pt-2 border-t border-brand-100">
+        <span class="text-slate-600 font-semibold block mb-1">Past tickets ({{ past_tickets|length }}):</span>
+        <div class="space-y-1">
+            {% for pt in past_tickets %}
+            <div class="flex items-center justify-between text-slate-700">
+                <a href="/tickets/{{ pt.ticket.id }}" target="_blank" class="text-brand-600 hover:underline font-mono">
+                    {{ pt.ticket.ticket_no }} - {{ pt.ticket.device_brand }} {{ pt.ticket.device_model }}
+                </a>
+                <div class="flex items-center gap-1">
+                    <span class="text-slate-500 text-[10px]">{{ pt.ticket.received_at|date_ist }}</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] border badge-{{ pt.ticket.status }}">{{ pt.ticket.status }}</span>
+                    {% if pt.under_warranty %}
+                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-100 text-emerald-700">Warranty</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>

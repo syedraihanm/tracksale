@@ -1,0 +1,31 @@
+<div class="py-1 divide-y divide-slate-100">
+    {% for r in results %}
+    <a href="/tickets/{{ r.ticket.id }}"
+       class="search-result-item block px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer {% if loop.first %}bg-slate-50{% endif %}"
+       {% if r.is_exact_ticket_no %}data-exact-match="true"{% endif %}>
+        <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-brand-600">{{ r.ticket.ticket_no }}</span>
+            <div class="flex items-center gap-1.5">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border badge-{{ r.ticket.status }}">
+                    {{ r.ticket.status|replace('_', ' ')|capitalize }}
+                </span>
+                {% if r.under_warranty %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Warranty
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="flex items-center justify-between mt-1 text-sm text-slate-700">
+            <span class="font-medium truncate">{{ r.ticket.device_brand }} {{ r.ticket.device_model }}</span>
+            <span class="text-xs text-slate-500">{{ r.ticket.customer.phone }}</span>
+        </div>
+        <div class="flex items-center justify-between mt-0.5 text-xs text-slate-500">
+            <span class="truncate max-w-[200px]">{{ r.ticket.customer.name }}</span>
+            {% if r.ticket.imei_or_serial %}
+            <span class="text-[11px] font-mono text-slate-400">IMEI: {{ r.ticket.imei_or_serial }}</span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>

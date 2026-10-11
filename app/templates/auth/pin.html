@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Owner PIN Unlock{% endblock %}
+
+{% block content %}
+<div class="min-h-[75vh] flex items-center justify-center">
+    <div class="w-full max-w-sm bg-white p-8 rounded-xl shadow-md border border-slate-200">
+        <div class="text-center mb-6">
+            <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                </svg>
+            </div>
+            <h1 class="text-xl font-bold text-slate-800">Owner Authorization</h1>
+            <p class="text-xs text-slate-500 mt-1">Enter your Owner PIN to continue</p>
+        </div>
+
+        {% if error %}
+        <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm text-center">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/pin" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+            <input type="hidden" name="next" value="{{ next_url|default('/') }}">
+
+            <div>
+                <label for="pin" class="block text-sm font-medium text-slate-700">Owner PIN</label>
+                <input type="password"
+                       id="pin"
+                       name="pin"
+                       required
+                       autofocus
+                       pattern="[0-9]{4,6}"
+                       inputmode="numeric"
+                       maxlength="6"
+                       placeholder="4-6 digits"
+                       class="mt-1 block w-full px-3 py-2 text-center text-lg tracking-widest border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500">
+            </div>
+
+            <button type="submit"
+                    class="w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg text-sm shadow transition focus:outline-none focus:ring-2 focus:ring-brand-500">
+                Unlock
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

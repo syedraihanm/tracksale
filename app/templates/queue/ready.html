@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Ready for Pickup{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-slate-800">Ready for Pickup</h1>
+            <p class="text-xs text-slate-500 mt-0.5">Repairs completed and waiting for customer collection (sorted oldest waiting first)</p>
+        </div>
+        <div class="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold">
+            {{ items|length }} Device(s) Ready
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {% if items %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-600">
+                <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                    <tr>
+                        <th class="px-6 py-3">Ticket</th>
+                        <th class="px-6 py-3">Customer</th>
+                        <th class="px-6 py-3">Device</th>
+                        <th class="px-6 py-3">Days Waiting</th>
+                        <th class="px-6 py-3 text-right">Amount Due</th>
+                        <th class="px-6 py-3 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for item in items %}
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-6 py-4 font-mono font-bold text-brand-600 whitespace-nowrap">
+                            <a href="/tickets/{{ item.ticket.id }}" class="hover:underline">
+                                {{ item.ticket.ticket_no }}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-medium text-slate-900 block">{{ item.ticket.customer.name }}</span>
+                            <span class="text-xs text-slate-400 font-mono">{{ item.ticket.customer.phone }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-medium text-slate-800">{{ item.ticket.device_brand }} {{ item.ticket.device_model }}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-xs">
+                            <span class="font-bold {% if item.waiting_days > 7 %}text-amber-600{% else %}text-slate-700{% endif %}">
+                                {{ item.waiting_days }} day(s)
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right font-mono font-bold text-slate-900">
+                            {% if item.balance_due > 0 %}
+                            {{ item.balance_due|inr }}
+                            {% elif item.balance_due < 0 %}
+                            <span class="text-emerald-600">Credit {{ item.balance_due|abs|inr }}</span>
+                            {% else %}
+                            <span class="text-slate-400">Paid in full</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right">
+                            <a href="{{ item.whatsapp_url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium shadow-sm transition">
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.53 1.77.814 2.79.814 3.181 0 5.767-2.586 5.768-5.766 0-3.18-2.586-5.766-5.767-5.766zm9.969 5.766c0 5.523-4.477 10-10 10-1.748 0-3.393-.45-4.829-1.242l-5.171 1.354 1.378-5.034c-.878-1.488-1.378-3.228-1.378-5.078 0-5.523 4.477-10 10-10s10 4.477 10 10z"/></svg>
+                                Send Reminder
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12 text-center text-slate-500 text-sm">
+            No devices currently waiting for pickup.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+target/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+data/
+backups/
+*.db
+*.db-wal
+*.db-shm
+.env
+.DS_Store

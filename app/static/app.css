@@ -1,0 +1,50 @@
+/* Print styling for digital receipts */
+@media print {
+    body {
+        background-color: white !important;
+        color: black !important;
+        font-size: 12pt;
+    }
+
+    header, nav, .no-print, button, .btn-action, #global-search, #toast-container {
+        display: none !important;
+    }
+
+    .receipt-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    a {
+        text-decoration: none !important;
+        color: black !important;
+    }
+}
+
+/* Custom UI enhancements */
+.badge-received { @apply bg-slate-100 text-slate-800 border-slate-300; }
+.badge-awaiting_approval { @apply bg-amber-100 text-amber-800 border-amber-300; }
+.badge-in_progress { @apply bg-blue-100 text-blue-800 border-blue-300; }
+.badge-awaiting_parts { @apply bg-orange-100 text-orange-800 border-orange-300; }
+.badge-ready_for_pickup { @apply bg-emerald-100 text-emerald-800 border-emerald-300; }
+.badge-delivered { @apply bg-zinc-200 text-zinc-800 border-zinc-400; }
+.badge-declined { @apply bg-rose-100 text-rose-800 border-rose-300; }
+.badge-unrepairable { @apply bg-red-100 text-red-800 border-red-300; }
+
+.overdue-status-row {
+    background-color: #fef3c7 !important; /* amber-100 */
+}
+
+/* Modal styles using native dialog */
+dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+dialog[open] {
+    display: flex;
+    flex-direction: column;
+}

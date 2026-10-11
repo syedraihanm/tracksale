@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Cash Reconciliation{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header with Date Picker & State Banner -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-xl font-bold text-slate-800">Daily Cash Close</h1>
+                {% if is_closed %}
+                <span class="px-3 py-1 rounded-full text-xs font-bold bg-zinc-200 text-zinc-800 border border-zinc-300">
+                    Day Closed
+                </span>
+                {% else %}
+                <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Day Open
+                </span>
+                {% endif %}
+            </div>
+            <p class="text-xs text-slate-500 mt-1">Reconcile cash drawer intake against payments and record variances</p>
+        </div>
+
+        <!-- Date Navigator -->
+        <form method="GET" action="/cash" class="flex items-center gap-2">
+            <label for="date-picker" class="text-xs font-medium text-slate-600">Reconcile Date:</label>
+            <input type="date"
+                   id="date-picker"
+                   name="date"
+                   value="{{ target_date.isoformat() }}"
+                   max="{{ today_ist.isoformat() }}"
+                   onchange="this.form.submit()"
+                   class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono focus:ring-brand-500 focus:border-brand-500">
+        </form>
+    </div>
+
+    {% if is_closed %}
+    <div class="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+            <span class="font-bold">This day is officially closed.</span>
+            <p class="text-amber-700 mt-0.5">All payment creations, edits, and deletions dated to this day are locked to preserve cash reconciliation.</p>
+        </div>
+        <button type="button"
+                onclick="openModal('reopen-day-dialog')"
+                class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold shrink-0 transition">
+            Reopen Day with PIN
+        </button>
+    </div>
+    {% endif %}
+
+    <!-- 3 Summary KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-medium text-slate-500 uppercase tracking-wider block">Cash Payments (Net)</span>
+            <span class="font-mono text-2xl font-extrabold text-slate-900 mt-1 block">
+                {{ summary.cash_net|inr }}
+            </span>
+            <div class="mt-2 text-xs text-slate-500 flex justify-between">
+                <span>Card: {{ summary.card_net|inr }}</span>
+                <span>UPI: {{ summary.upi_net|inr }}</span>
+            </div>
+            <span class="text-[10px] text-slate-400 mt-1 block">*Card & UPI totals are for reference only</span>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-medium text-slate-500 uppercase tracking-wider block">Expected Cash</span>
+            <div id="expected-cash-display" class="font-mono text-2xl font-extrabold text-slate-900 mt-1">
+                {{ expected_cash|inr }}
+            </div>
+            <span class="text-xs text-slate-500 mt-2 block">Opening Cash + Net Cash Payments</span>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-medium text-slate-500 uppercase tracking-wider block">Cash Variance</span>
+            <div id="variance-display" class="font-mono text-2xl font-extrabold mt-1 {% if variance == 0 %}text-emerald-600{% elif variance < 0 %}text-red-600{% else %}text-amber-600{% endif %}">
+                {% if variance > 0 %}+{% endif %}{{ variance|inr }}
+            </div>
+            <span class="text-xs text-slate-500 mt-2 block">Counted Cash − Expected Cash</span>
+        </div>
+    </div>
+
+    <!-- Reconciliation Entry Form & Mode Breakdown -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Close Day Form -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+            <h2 class="text-base font-bold text-slate-800">
+                {% if is_closed %}Reconciliation Snapshot{% else %}Perform Day Closing{% endif %}
+            </h2>
+
+            {% if not is_closed %}
+            <form method="POST" action="/cash/{{ target_date.isoformat() }}/close" class="space-y-4 text-xs">
+                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+
+                <div>
+                    <label class="block font-medium text-slate-700">Opening Cash ₹</label>
+                    <input type="text"
+                           id="opening_cash_input"
+                           name="opening_cash"
+                           value="{{ opening_cash }}"
+                           required
+                           hx-get="/cash/expected?date={{ target_date.isoformat() }}"
+                           hx-trigger="input changed delay:200ms"
+                           hx-include="#opening_cash_input, #counted_cash_input"
+                           class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm focus:ring-brand-500">
+                    <p class="text-[11px] text-slate-400 mt-0.5">Defaults to counted cash of previous closed day</p>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700">Counted Cash in Drawer ₹ *</label>
+                    <input type="text"
+                           id="counted_cash_input"
+                           name="counted_cash"
+                           value="{{ counted_cash }}"
+                           required
+                           hx-get="/cash/expected?date={{ target_date.isoformat() }}"
+                           hx-trigger="input changed delay:200ms"
+                           hx-include="#opening_cash_input, #counted_cash_input"
+                           class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm focus:ring-brand-500">
+                    <p class="text-[11px] text-slate-400 mt-0.5">Actual physical cash counted at end of day</p>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700">Closing Note (Optional)</label>
+                    <textarea name="note" rows="2" placeholder="e.g. ₹50 shortage due to coin change" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"></textarea>
+                </div>
+
+                <button type="submit"
+                        onclick="return confirm('Close cash for {{ target_date|date_ist }}? Once closed, payments for this date will be locked.')"
+                        class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg transition text-xs shadow-sm">
+                    Close Cash Day
+                </button>
+            </form>
+            {% else %}
+            <!-- Snapshot Details -->
+            <div class="space-y-3 text-xs text-slate-700">
+                <div class="flex justify-between py-1.5 border-b border-slate-100">
+                    <span class="text-slate-500">Opening Cash:</span>
+                    <span class="font-mono font-bold">{{ closing.opening_cash|inr }}</span>
+                </div>
+                <div class="flex justify-between py-1.5 border-b border-slate-100">
+                    <span class="text-slate-500">Expected Cash:</span>
+                    <span class="font-mono font-bold">{{ closing.expected_cash|inr }}</span>
+                </div>
+                <div class="flex justify-between py-1.5 border-b border-slate-100">
+                    <span class="text-slate-500">Counted Cash:</span>
+                    <span class="font-mono font-bold">{{ closing.counted_cash|inr }}</span>
+                </div>
+                <div class="flex justify-between py-1.5 border-b border-slate-100">
+                    <span class="text-slate-500">Variance:</span>
+                    <span class="font-mono font-bold {% if closing.variance == 0 %}text-emerald-600{% elif closing.variance < 0 %}text-red-600{% else %}text-amber-600{% endif %}">
+                        {% if closing.variance > 0 %}+{% endif %}{{ closing.variance|inr }}
+                    </span>
+                </div>
+                <div class="flex justify-between py-1.5 border-b border-slate-100">
+                    <span class="text-slate-500">Closed At:</span>
+                    <span class="text-slate-700 font-mono">{{ closing.closed_at|datetime_ist }}</span>
+                </div>
+                {% if closing.note %}
+                <div class="pt-2">
+                    <span class="text-slate-500 block">Note:</span>
+                    <p class="italic text-slate-700 mt-1 bg-slate-50 p-2 rounded">{{ closing.note }}</p>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Payments Grouped Table -->
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-6 border-b border-slate-200">
+                <h2 class="text-base font-bold text-slate-800">
+                    Payments on {{ target_date|date_ist }} ({{ summary.payments|length }})
+                </h2>
+            </div>
+
+            {% if summary.payments %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-600">
+                    <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                        <tr>
+                            <th class="px-6 py-3">Time</th>
+                            <th class="px-6 py-3">Ticket</th>
+                            <th class="px-6 py-3">Mode</th>
+                            <th class="px-6 py-3">Kind</th>
+                            <th class="px-6 py-3 text-right">Amount</th>
+                            <th class="px-6 py-3">Note</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for p in summary.payments %}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="px-6 py-3 whitespace-nowrap font-mono text-slate-500">
+                                {{ p.paid_at|time_ist }}
+                            </td>
+                            <td class="px-6 py-3 whitespace-nowrap font-mono font-bold text-brand-600">
+                                <a href="/tickets/{{ p.ticket_id }}" class="hover:underline">
+                                    {{ p.ticket.ticket_no }}
+                                </a>
+                            </td>
+                            <td class="px-6 py-3 uppercase font-medium">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold {% if p.mode == 'cash' %}bg-emerald-50 text-emerald-700{% elif p.mode == 'upi' %}bg-blue-50 text-blue-700{% else %}bg-purple-50 text-purple-700{% endif %}">
+                                    {{ p.mode }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-3 capitalize font-semibold {% if p.kind == 'refund' %}text-red-600{% elif p.kind == 'advance' %}text-blue-600{% else %}text-slate-700{% endif %}">
+                                {{ p.kind }}
+                            </td>
+                            <td class="px-6 py-3 text-right font-mono font-bold {% if p.amount < 0 %}text-red-600{% else %}text-slate-900{% endif %}">
+                                {{ p.amount|inr }}
+                            </td>
+                            <td class="px-6 py-3 text-slate-500 truncate max-w-xs">
+                                {{ p.note or '-' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-8 text-center text-slate-500 text-xs">
+                No payments recorded on this date.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Closings History Table (Last 10) -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-6 border-b border-slate-200">
+            <h2 class="text-base font-bold text-slate-800">Recent Day Closings</h2>
+        </div>
+
+        {% if recent_closings %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                    <tr>
+                        <th class="px-6 py-3">Date</th>
+                        <th class="px-6 py-3 text-right">Opening</th>
+                        <th class="px-6 py-3 text-right">Expected</th>
+                        <th class="px-6 py-3 text-right">Counted</th>
+                        <th class="px-6 py-3 text-right">Variance</th>
+                        <th class="px-6 py-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for c in recent_closings %}
+                    <tr class="hover:bg-slate-50 transition cursor-pointer" onclick="window.location='/cash?date={{ c.date.isoformat() }}'">
+                        <td class="px-6 py-3 font-medium text-slate-900">{{ c.date|date_ist }}</td>
+                        <td class="px-6 py-3 text-right font-mono">{{ c.opening_cash|inr }}</td>
+                        <td class="px-6 py-3 text-right font-mono">{{ c.expected_cash|inr }}</td>
+                        <td class="px-6 py-3 text-right font-mono font-bold">{{ c.counted_cash|inr }}</td>
+                        <td class="px-6 py-3 text-right font-mono font-bold {% if c.variance == 0 %}text-emerald-600{% elif c.variance < 0 %}text-red-600{% else %}text-amber-600{% endif %}">
+                            {% if c.variance > 0 %}+{% endif %}{{ c.variance|inr }}
+                        </td>
+                        <td class="px-6 py-3">
+                            {% if c.is_closed %}
+                            <span class="text-zinc-500 font-semibold text-[10px]">Closed</span>
+                            {% else %}
+                            <span class="text-amber-600 font-semibold text-[10px]">Reopened</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-slate-500 text-xs">No previous closings recorded.</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Reopen Day Dialog -->
+<dialog id="reopen-day-dialog" class="p-6 rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full bg-white">
+    <form method="POST" action="/cash/{{ target_date.isoformat() }}/reopen" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+        <h3 class="text-lg font-bold text-slate-900">Reopen Closed Day</h3>
+        <p class="text-xs text-slate-500">Enter your Owner PIN to unlock payments and modifications for this date.</p>
+
+        <div>
+            <label class="block text-xs font-medium text-slate-700">Owner PIN *</label>
+            <input type="password" name="owner_pin" required placeholder="Owner PIN" autofocus class="mt-1 w-full px-3 py-2 border border-slate-300 rounded text-xs font-mono">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal('reopen-day-dialog')" class="px-4 py-2 text-xs text-slate-600 hover:text-slate-900">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-bold transition">Reopen Day</button>
+        </div>
+    </form>
+</dialog>
+{% endblock %}

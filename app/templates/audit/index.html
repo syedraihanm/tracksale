@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Trail{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-slate-800">System Audit Log</h1>
+            <p class="text-xs text-slate-500 mt-0.5">Immutable audit trail of all creations, modifications, and deletions</p>
+        </div>
+
+        <!-- Filter Form -->
+        <form method="GET" action="/audit" class="flex flex-wrap items-center gap-2 text-xs">
+            <select name="entity" class="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white">
+                <option value="">All Entities</option>
+                <option value="ticket" {% if selected_entity == 'ticket' %}selected{% endif %}>Ticket</option>
+                <option value="payment" {% if selected_entity == 'payment' %}selected{% endif %}>Payment</option>
+                <option value="item" {% if selected_entity == 'item' %}selected{% endif %}>Line Item</option>
+                <option value="customer" {% if selected_entity == 'customer' %}selected{% endif %}>Customer</option>
+                <option value="cash_closing" {% if selected_entity == 'cash_closing' %}selected{% endif %}>Cash Close</option>
+                <option value="settings" {% if selected_entity == 'settings' %}selected{% endif %}>Settings</option>
+            </select>
+
+            <input type="text"
+                   name="ticket_no"
+                   value="{{ selected_ticket_no or '' }}"
+                   placeholder="Ticket No (e.g. R-1001)"
+                   class="px-2.5 py-1.5 border border-slate-300 rounded-lg">
+
+            <input type="date"
+                   name="date"
+                   value="{{ selected_date or '' }}"
+                   class="px-2.5 py-1.5 border border-slate-300 rounded-lg">
+
+            <button type="submit" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-medium transition">
+                Filter
+            </button>
+            <a href="/audit" class="px-2.5 py-1.5 text-slate-500 hover:text-slate-800">Clear</a>
+        </form>
+    </div>
+
+    <!-- Audit Log Records Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {% if logs %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                    <tr>
+                        <th class="px-6 py-3">Timestamp (IST)</th>
+                        <th class="px-6 py-3">Action</th>
+                        <th class="px-6 py-3">Entity</th>
+                        <th class="px-6 py-3">Ticket</th>
+                        <th class="px-6 py-3">Reason</th>
+                        <th class="px-6 py-3">Changes</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-mono">
+                    {% for l in logs %}
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-6 py-3 whitespace-nowrap text-slate-500">
+                            {{ l.timestamp|datetime_ist }}
+                        </td>
+                        <td class="px-6 py-3 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
+                                         {% if l.action == 'create' %}bg-emerald-50 text-emerald-700{% elif l.action == 'delete' %}bg-red-50 text-red-700{% else %}bg-blue-50 text-blue-700{% endif %}">
+                                {{ l.action }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-3 uppercase text-slate-700">
+                            {{ l.entity }} #{{ l.entity_id }}
+                        </td>
+                        <td class="px-6 py-3 whitespace-nowrap font-bold text-brand-600">
+                            {% if l.ticket_id and ticket_map.get(l.ticket_id) %}
+                            <a href="/tickets/{{ l.ticket_id }}" class="hover:underline">
+                                {{ ticket_map[l.ticket_id] }}
+                            </a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-3 font-sans text-slate-600 max-w-xs truncate">
+                            {{ l.reason or '-' }}
+                        </td>
+                        <td class="px-6 py-3 max-w-md">
+                            {% if l.changed_fields %}
+                            <pre class="text-[10px] bg-slate-50 p-1.5 rounded border border-slate-100 overflow-x-auto max-h-20">{{ l.changed_fields }}</pre>
+                            {% else %}
+                            <span class="text-slate-400 font-sans">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12 text-center text-slate-500 text-xs">
+            No audit records matching criteria.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

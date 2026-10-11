@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Ticket Queue{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Top Action & Filter Bar -->
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-slate-800">Repair Queue</h1>
+            <p class="text-xs text-slate-500">Live active repair status tracking</p>
+        </div>
+
+        <!-- Filter Chips Form -->
+        <form id="queue-filter-form"
+              hx-get="/"
+              hx-target="#queue-container"
+              hx-trigger="change"
+              hx-push-url="true"
+              class="flex flex-wrap items-center gap-1.5 text-xs">
+            <input type="hidden" name="filtered" value="1">
+            {% for s in all_statuses %}
+            <label class="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition select-none
+                          {% if s in selected_statuses %}bg-slate-800 text-white border-slate-800 shadow-sm{% else %}bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100{% endif %}"
+                   title="Click to toggle, double-click to view only this status"
+                   ondblclick="selectOnlyThis(this)">
+                <input type="checkbox"
+                       name="status"
+                       value="{{ s }}"
+                       onchange="toggleChip(this)"
+                       {% if s in selected_statuses %}checked{% endif %}
+                       class="sr-only">
+                <span>{{ status_display_names[s] }}</span>
+            </label>
+            {% endfor %}
+            <div class="flex items-center gap-1 ml-1 border-l border-slate-200 pl-2">
+                <button type="button"
+                        onclick="selectAllActive()"
+                        class="px-2 py-0.5 text-[11px] font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition"
+                        title="Reset to all active repair statuses">
+                    All Active
+                </button>
+                <button type="button"
+                        onclick="clearAllStatuses()"
+                        class="px-2 py-0.5 text-[11px] font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition"
+                        title="Deselect all statuses">
+                    Clear
+                </button>
+            </div>
+        </form>
+
+        <a href="/tickets/new"
+           class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center gap-1.5 shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            Intake New Ticket
+        </a>
+    </div>
+
+    <!-- Queue Container (swapped by HTMX filter changes) -->
+    <div id="queue-container">
+        {% include "partials/queue_table.html" %}
+    </div>
+</div>
+
+<script>
+function toggleChip(input) {
+    const label = input.closest('label');
+    if (!label) return;
+    if (input.checked) {
+        label.classList.remove('bg-slate-50', 'text-slate-600', 'border-slate-200', 'hover:bg-slate-100');
+        label.classList.add('bg-slate-800', 'text-white', 'border-slate-800', 'shadow-sm');
+    } else {
+        label.classList.remove('bg-slate-800', 'text-white', 'border-slate-800', 'shadow-sm');
+        label.classList.add('bg-slate-50', 'text-slate-600', 'border-slate-200', 'hover:bg-slate-100');
+    }
+}
+
+function selectAllActive() {
+    const activeDefaults = ['received', 'awaiting_approval', 'in_progress', 'awaiting_parts', 'ready_for_pickup', 'declined', 'unrepairable'];
+    const form = document.getElementById('queue-filter-form');
+    if (!form) return;
+    form.querySelectorAll('input[name="status"]').forEach(input => {
+        input.checked = activeDefaults.includes(input.value);
+        toggleChip(input);
+    });
+    htmx.trigger(form, 'change');
+}
+
+function clearAllStatuses() {
+    const form = document.getElementById('queue-filter-form');
+    if (!form) return;
+    form.querySelectorAll('input[name="status"]').forEach(input => {
+        input.checked = false;
+        toggleChip(input);
+    });
+    htmx.trigger(form, 'change');
+}
+
+function selectOnlyThis(label) {
+    const input = label.querySelector('input[name="status"]');
+    if (!input) return;
+    const form = document.getElementById('queue-filter-form');
+    if (!form) return;
+    form.querySelectorAll('input[name="status"]').forEach(inp => {
+        inp.checked = (inp === input);
+        toggleChip(inp);
+    });
+    htmx.trigger(form, 'change');
+}
+</script>
+{% endblock %}

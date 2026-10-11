@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Initial Setup{% endblock %}
+
+{% block content %}
+<div class="min-h-[75vh] flex items-center justify-center">
+    <div class="w-full max-w-md bg-white p-8 rounded-xl shadow-md border border-slate-200">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-slate-800">Shop System Setup</h1>
+            <p class="text-sm text-slate-600 mt-1">Configure your repair shop details and master credentials</p>
+        </div>
+
+        {% if error %}
+        <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/setup" class="space-y-4">
+            <div>
+                <label for="shop_name" class="block text-sm font-medium text-slate-700">Shop Name</label>
+                <input type="text"
+                       id="shop_name"
+                       name="shop_name"
+                       value="{{ shop_name|default('Mobile Repair Shop') }}"
+                       required
+                       class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 text-sm">
+            </div>
+
+            <div>
+                <label for="password" class="block text-sm font-medium text-slate-700">Admin Password</label>
+                <input type="password"
+                       id="password"
+                       name="password"
+                       required
+                       minlength="8"
+                       placeholder="At least 8 characters"
+                       class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 text-sm">
+                <p class="text-xs text-slate-500 mt-1">Used for daily login to the system</p>
+            </div>
+
+            <div>
+                <label for="owner_pin" class="block text-sm font-medium text-slate-700">Owner PIN</label>
+                <input type="password"
+                       id="owner_pin"
+                       name="owner_pin"
+                       required
+                       pattern="[0-9]{4,6}"
+                       inputmode="numeric"
+                       maxlength="6"
+                       placeholder="4 to 6 numeric digits"
+                       class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 text-sm">
+                <p class="text-xs text-slate-500 mt-1">Used to authorize deletions, day reopenings, and view analytics</p>
+            </div>
+
+            <button type="submit"
+                    class="w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg text-sm shadow transition focus:outline-none focus:ring-2 focus:ring-brand-500">
+                Complete Setup & Launch
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

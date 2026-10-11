@@ -1,0 +1,709 @@
+{% extends "base.html" %}
+
+{% block title %}Ticket {{ ticket.ticket_no }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Banners -->
+    {% if ticket.is_deleted %}
+    <div class="p-4 bg-red-100 border-l-4 border-red-500 text-red-900 rounded-r-lg shadow-sm">
+        <div class="flex items-center justify-between">
+            <div>
+                <span class="font-bold">This ticket is soft-deleted.</span>
+                <p class="text-xs mt-0.5">Reason: {{ ticket.deleted_reason }} • Deleted at: {{ ticket.deleted_at|datetime_ist }}</p>
+            </div>
+            <span class="px-2.5 py-1 bg-red-200 text-red-900 font-mono text-xs font-bold rounded">DELETED</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if ticket.parent_ticket %}
+    <div class="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg text-xs flex items-center justify-between">
+        <span>This is a <strong>Warranty Return ticket</strong> for parent:
+            <a href="/tickets/{{ ticket.parent_ticket.id }}" class="font-mono font-bold underline ml-1 text-brand-600">
+                {{ ticket.parent_ticket.ticket_no }}
+            </a>
+        </span>
+        <span class="text-slate-500">Parent delivered on {{ ticket.parent_ticket.delivered_at|date_ist }}</span>
+    </div>
+    {% endif %}
+
+    {% if ticket.child_tickets %}
+    <div class="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-lg text-xs space-y-1">
+        <span class="font-bold block">Linked Warranty Return(s):</span>
+        {% for child in ticket.child_tickets %}
+        {% if not child.is_deleted %}
+        <div>
+            Return Ticket:
+            <a href="/tickets/{{ child.id }}" class="font-mono font-bold underline text-brand-600">
+                {{ child.ticket_no }}
+            </a>
+            (Received: {{ child.received_at|date_ist }}, Status: {{ child.status }})
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Top Header Bar -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center gap-3 flex-wrap">
+            <h1 class="text-2xl font-extrabold text-slate-900 font-mono">{{ ticket.ticket_no }}</h1>
+            <span class="px-3 py-1 rounded-full text-xs font-semibold border badge-{{ ticket.status }}">
+                {{ ticket.status|replace('_', ' ')|capitalize }}
+            </span>
+            {% if under_warranty %}
+            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                Under Warranty until {{ ticket.warranty_until|date_ist }}
+            </span>
+            {% elif ticket.warranty_until %}
+            <span class="px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                Warranty Expired ({{ ticket.warranty_until|date_ist }})
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Action Links -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <a href="/tickets/{{ ticket.id }}/receipt"
+               class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition inline-flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Digital Receipt
+            </a>
+
+            {% if ticket.status == 'ready_for_pickup' %}
+            <a href="{{ wa_ready_url }}"
+               target="_blank"
+               rel="noopener"
+               class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition inline-flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.53 1.77.814 2.79.814 3.181 0 5.767-2.586 5.768-5.766 0-3.18-2.586-5.766-5.767-5.766zm9.969 5.766c0 5.523-4.477 10-10 10-1.748 0-3.393-.45-4.829-1.242l-5.171 1.354 1.378-5.034c-.878-1.488-1.378-3.228-1.378-5.078 0-5.523 4.477-10 10-10s10 4.477 10 10z"/></svg>
+                WhatsApp Ready Msg
+            </a>
+            {% else %}
+            <a href="{{ wa_intake_url }}"
+               target="_blank"
+               rel="noopener"
+               class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition inline-flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.53 1.77.814 2.79.814 3.181 0 5.767-2.586 5.768-5.766 0-3.18-2.586-5.766-5.767-5.766zm9.969 5.766c0 5.523-4.477 10-10 10-1.748 0-3.393-.45-4.829-1.242l-5.171 1.354 1.378-5.034c-.878-1.488-1.378-3.228-1.378-5.078 0-5.523 4.477-10 10-10s10 4.477 10 10z"/></svg>
+                WhatsApp Intake Msg
+            </a>
+            {% endif %}
+
+            {% if ticket.status == 'delivered' and not ticket.is_deleted %}
+            <a href="/tickets/new?parent={{ ticket.id }}"
+               class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition inline-flex items-center gap-1">
+                + Warranty Return
+            </a>
+            {% endif %}
+
+            {% if not ticket.is_deleted %}
+            <button type="button"
+                    onclick="openModal('delete-ticket-dialog')"
+                    class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg transition">
+                Delete Ticket
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Main 2-Column Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left 2 Cols: Details, Line Items, Payments -->
+        <div class="lg:col-span-2 space-y-6">
+
+            <!-- Device & Intake Details Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h2 class="text-base font-bold text-slate-800">Device & Issue Details</h2>
+                    {% if not ticket.is_deleted %}
+                    <button type="button"
+                            onclick="document.getElementById('edit-details-form').classList.toggle('hidden'); document.getElementById('details-display-card').classList.toggle('hidden')"
+                            class="text-xs text-brand-600 hover:underline font-medium">
+                        Edit Details
+                    </button>
+                    {% endif %}
+                </div>
+
+                <!-- Display Mode -->
+                <div id="details-display-card" class="space-y-4 text-sm">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <span class="text-xs text-slate-400 block uppercase">Customer</span>
+                            <a href="/customers/{{ ticket.customer.id }}" class="font-bold text-slate-900 hover:text-brand-600">
+                                {{ ticket.customer.name }}
+                            </a>
+                            <span class="text-xs text-slate-500 block font-mono">{{ ticket.customer.phone }}</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 block uppercase">Device</span>
+                            <span class="font-bold text-slate-900">{{ ticket.device_brand }} {{ ticket.device_model }}</span>
+                            <span class="text-xs text-slate-500 block">{{ ticket.color or 'Color not specified' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 block uppercase">IMEI / Serial</span>
+                            <span class="font-mono text-slate-800">{{ ticket.imei_or_serial or '-' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 block uppercase">Estimate</span>
+                            <span class="font-mono font-bold text-slate-900">{{ ticket.estimate_amount|inr if ticket.estimate_amount else '-' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+                        <div>
+                            <span class="text-xs text-slate-400 block uppercase">Received</span>
+                            <span class="text-slate-700 text-xs">{{ ticket.received_at|datetime_ist }}</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 block uppercase">Ready</span>
+                            <span class="text-slate-700 text-xs">{{ ticket.ready_at|datetime_ist if ticket.ready_at else '-' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 block uppercase">Delivered</span>
+                            <span class="text-slate-700 text-xs">{{ ticket.delivered_at|datetime_ist if ticket.delivered_at else '-' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-100">
+                        <span class="text-xs text-slate-400 block uppercase">Reported Issue ({{ ticket.issue_category }})</span>
+                        <p class="mt-1 font-medium text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            {{ ticket.reported_issue }}
+                        </p>
+                    </div>
+
+                    <!-- Passcode Block -->
+                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 block uppercase">Device Passcode</span>
+                            <div id="passcode-reveal-target" class="mt-0.5">
+                                {% if ticket.passcode_encrypted %}
+                                <span class="font-mono text-slate-400 text-sm">••••••••</span>
+                                {% else %}
+                                <span class="text-xs text-slate-400 italic">None or Cleared</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if ticket.passcode_encrypted and not ticket.is_deleted %}
+                        <div class="flex items-center gap-2">
+                            <button type="button"
+                                    hx-post="/tickets/{{ ticket.id }}/passcode/reveal"
+                                    hx-target="#passcode-reveal-target"
+                                    hx-swap="innerHTML"
+                                    class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded transition">
+                                Show Passcode
+                            </button>
+                            <button type="button"
+                                    hx-post="/tickets/{{ ticket.id }}/passcode/clear"
+                                    hx-target="#passcode-reveal-target"
+                                    hx-swap="innerHTML"
+                                    class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-red-600 text-xs font-medium rounded transition">
+                                Clear
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if ticket.technician_note %}
+                    <div class="pt-2 border-t border-slate-100">
+                        <span class="text-xs text-slate-400 block uppercase">Technician Notes</span>
+                        <p class="text-xs text-slate-700 mt-1 italic">{{ ticket.technician_note }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Edit Mode Form (Hidden by default) -->
+                <form id="edit-details-form" method="POST" action="/tickets/{{ ticket.id }}/edit" class="hidden space-y-4 text-sm pt-2">
+                    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700">Brand</label>
+                            <input type="text" name="device_brand" value="{{ ticket.device_brand }}" required class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700">Model</label>
+                            <input type="text" name="device_model" value="{{ ticket.device_model }}" required class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700">Color</label>
+                            <input type="text" name="color" value="{{ ticket.color or '' }}" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700">IMEI</label>
+                            <input type="text" name="imei_or_serial" value="{{ ticket.imei_or_serial or '' }}" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700">Issue Category</label>
+                        <select name="issue_category" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs">
+                            {% for cat in categories %}
+                            <option value="{{ cat }}" {% if cat == ticket.issue_category %}selected{% endif %}>{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700">Reported Issue</label>
+                        <textarea name="reported_issue" rows="2" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs">{{ ticket.reported_issue }}</textarea>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700">Estimate ₹</label>
+                            <input type="text" name="estimate_amount" value="{{ ticket.estimate_amount or '' }}" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700">Technician Note</label>
+                            <input type="text" name="technician_note" value="{{ ticket.technician_note or '' }}" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs">
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" onclick="document.getElementById('edit-details-form').classList.add('hidden'); document.getElementById('details-display-card').classList.remove('hidden')" class="px-3 py-1 text-xs text-slate-500">Cancel</button>
+                        <button type="submit" class="px-4 py-1.5 bg-brand-600 text-white rounded text-xs font-medium hover:bg-brand-700">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Line Items Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h2 class="text-base font-bold text-slate-800">Repair Line Items</h2>
+                    <span class="text-xs font-mono font-bold text-slate-600">Total Charged: {{ items_total|inr }}</span>
+                </div>
+
+                <!-- Existing Items Table -->
+                {% if visible_items %}
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-600">
+                        <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400">
+                            <tr>
+                                <th class="px-3 py-2">Type</th>
+                                <th class="px-3 py-2">Description</th>
+                                <th class="px-3 py-2 text-right">Price Charged</th>
+                                <th class="px-3 py-2 text-right">Part Cost</th>
+                                <th class="px-3 py-2">Supplier</th>
+                                <th class="px-3 py-2 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for it in visible_items %}
+                            <tr>
+                                <td class="px-3 py-2 font-semibold uppercase text-[10px] {% if it.type == 'labor' %}text-blue-600{% else %}text-amber-600{% endif %}">
+                                    {{ it.type }}
+                                </td>
+                                <td class="px-3 py-2 font-medium text-slate-800">{{ it.description }}</td>
+                                <td class="px-3 py-2 text-right font-mono font-bold">{{ it.price_charged|inr }}</td>
+                                <td class="px-3 py-2 text-right font-mono text-slate-500">
+                                    {% if it.type == 'part' %}{{ it.cost_price|inr }}{% else %}-{% endif %}
+                                </td>
+                                <td class="px-3 py-2 text-slate-500">{{ it.supplier_name or '-' }}</td>
+                                <td class="px-3 py-2 text-right">
+                                    {% if not ticket.is_deleted %}
+                                    <form method="POST" action="/items/{{ it.id }}/delete" class="inline" onsubmit="return confirm('Remove line item?')">
+                                        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                                        {% if ticket.status == 'delivered' %}
+                                        <input type="password" name="owner_pin" placeholder="PIN" required class="w-16 px-1 py-0.5 border text-xs">
+                                        {% endif %}
+                                        <button type="submit" class="text-red-500 hover:text-red-700 text-xs">Remove</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-xs text-slate-400 italic">No line items added yet.</p>
+                {% endif %}
+
+                <!-- Add Line Item Form -->
+                {% if not ticket.is_deleted %}
+                <div class="pt-3 border-t border-slate-100 bg-slate-50 p-4 rounded-lg">
+                    <span class="text-xs font-bold text-slate-700 block mb-2">+ Add Line Item</span>
+                    <form method="POST" action="/tickets/{{ ticket.id }}/items" class="space-y-3">
+                        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+                            <div>
+                                <label class="block text-[11px] text-slate-600">Type</label>
+                                <select name="item_type"
+                                        id="item_type_select"
+                                        onchange="document.getElementById('part-fields').classList.toggle('hidden', this.value !== 'part')"
+                                        class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded bg-white">
+                                    <option value="labor" selected>Labor</option>
+                                    <option value="part">Part</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] text-slate-600">Description *</label>
+                                <input type="text" name="description" required placeholder="e.g. Display replacement, Charging flex" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-600">Price Charged ₹ *</label>
+                                <input type="text" name="price_charged" required placeholder="e.g. 1500" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded font-mono">
+                            </div>
+                        </div>
+
+                        <!-- Extra fields for Parts -->
+                        <div id="part-fields" class="hidden grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-1">
+                            <div>
+                                <label class="block text-[11px] text-slate-600">Cost Price ₹ (Parts only)</label>
+                                <input type="text" name="cost_price" value="0" placeholder="e.g. 1100" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-600">Supplier Name (Optional)</label>
+                                <input type="text" name="supplier_name" placeholder="e.g. Metro Spares" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded">
+                            </div>
+                        </div>
+
+                        {% if ticket.status == 'delivered' %}
+                        <div class="text-xs text-amber-700 bg-amber-50 p-2 rounded flex items-center gap-2">
+                            <span>Ticket is delivered. Owner PIN required to alter billing:</span>
+                            <input type="password" name="owner_pin" required placeholder="PIN" class="px-2 py-1 border border-amber-300 rounded w-20">
+                        </div>
+                        {% endif %}
+
+                        <div class="flex justify-end">
+                            <button type="submit" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded transition">
+                                Add Item
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Payments & Balance Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h2 class="text-base font-bold text-slate-800">Payments & Balance</h2>
+                    <div class="text-right">
+                        <span class="text-xs text-slate-400 block uppercase">Balance Due</span>
+                        <span class="font-mono text-lg font-extrabold {% if balance_due > 0 %}text-slate-900{% elif balance_due < 0 %}text-emerald-600{% else %}text-slate-500{% endif %}">
+                            {% if balance_due < 0 %}Credit {{ balance_due|abs|inr }}{% else %}{{ balance_due|inr }}{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Payments Table -->
+                {% if payments_list %}
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-600">
+                        <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400">
+                            <tr>
+                                <th class="px-3 py-2">Paid At</th>
+                                <th class="px-3 py-2">Mode</th>
+                                <th class="px-3 py-2">Kind</th>
+                                <th class="px-3 py-2 text-right">Amount</th>
+                                <th class="px-3 py-2">Note</th>
+                                <th class="px-3 py-2 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for p in payments_list %}
+                            <tr class="{% if p.is_deleted %}line-through text-slate-400 bg-slate-50{% endif %}">
+                                <td class="px-3 py-2 whitespace-nowrap">{{ p.paid_at|datetime_ist }}</td>
+                                <td class="px-3 py-2 uppercase font-medium">{{ p.mode }}</td>
+                                <td class="px-3 py-2 capitalize font-semibold {% if p.kind == 'refund' %}text-red-600{% elif p.kind == 'advance' %}text-blue-600{% else %}text-emerald-600{% endif %}">
+                                    {{ p.kind }}
+                                </td>
+                                <td class="px-3 py-2 text-right font-mono font-bold {% if p.amount < 0 %}text-red-600{% else %}text-slate-900{% endif %}">
+                                    {{ p.amount|inr }}
+                                </td>
+                                <td class="px-3 py-2">
+                                    {{ p.note or '-' }}
+                                    {% if p.is_deleted %}
+                                    <span class="block text-[10px] text-red-500">Deleted: {{ p.deleted_reason }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-2 text-right whitespace-nowrap">
+                                    {% if not p.is_deleted and not ticket.is_deleted %}
+                                    <button type="button"
+                                            onclick="openDeletePaymentModal('{{ p.id }}', '{{ p.amount|inr }}')"
+                                            class="text-red-500 hover:text-red-700 text-xs font-medium">
+                                        Delete
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-xs text-slate-400 italic">No payments recorded yet.</p>
+                {% endif %}
+
+                <!-- Add Payment Form -->
+                {% if not ticket.is_deleted %}
+                <div class="pt-3 border-t border-slate-100 bg-slate-50 p-4 rounded-lg">
+                    <span class="text-xs font-bold text-slate-700 block mb-2">+ Record Payment / Refund</span>
+                    <form method="POST" action="/tickets/{{ ticket.id }}/payments" class="space-y-3">
+                        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+                            <div>
+                                <label class="block text-[11px] text-slate-600">Kind *</label>
+                                <select name="kind" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded bg-white">
+                                    <option value="final" selected>Final Payment</option>
+                                    <option value="advance">Advance</option>
+                                    <option value="refund">Refund (Positive ₹)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-600">Amount ₹ *</label>
+                                <input type="text" name="amount" required placeholder="e.g. 1000" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-600">Mode *</label>
+                                <select name="mode" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded bg-white">
+                                    <option value="cash" selected>Cash</option>
+                                    <option value="upi">UPI</option>
+                                    <option value="card">Card</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-600">Note / Reason</label>
+                                <input type="text" name="note" placeholder="UPI ref or refund reason" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded">
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-1">
+                            <label class="flex items-center gap-1.5 text-[11px] text-slate-600 select-none cursor-pointer">
+                                <input type="checkbox" name="confirm_overpay" value="1" class="rounded text-brand-600">
+                                <span>Confirm overpayment if exceeding balance</span>
+                            </label>
+                            <button type="submit" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition shadow-sm">
+                                Record Payment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right 1 Col: Status Transition Panel & History -->
+        <div class="space-y-6">
+
+            <!-- Status Transition Panel -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <h2 class="text-base font-bold text-slate-800">Status Actions</h2>
+
+                {% if ticket.status == 'delivered' %}
+                <div class="p-3 bg-zinc-100 rounded-lg text-xs text-zinc-700 text-center font-medium">
+                    This ticket is delivered and in final state.
+                </div>
+                {% elif ticket.is_deleted %}
+                <div class="p-3 bg-red-50 rounded-lg text-xs text-red-700 text-center font-medium">
+                    Ticket is deleted. Status changes disabled.
+                </div>
+                {% else %}
+                <div class="space-y-2">
+                    <span class="text-xs text-slate-500 uppercase tracking-wider block">Allowed Next Status:</span>
+                    {% for next_st in allowed_transitions %}
+                    <div>
+                        {% if next_st == 'delivered' %}
+                        <button type="button"
+                                onclick="openModal('delivery-dialog')"
+                                class="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2">
+                            <span>Deliver Device...</span>
+                        </button>
+                        {% else %}
+                        <form method="POST" action="/tickets/{{ ticket.id }}/status" class="inline block w-full">
+                            <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                            <input type="hidden" name="to_status" value="{{ next_st }}">
+                            <button type="submit"
+                                    class="w-full py-2 px-3 mb-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium transition text-left flex items-center justify-between">
+                                <span>Move to <strong>{{ next_st|replace('_', ' ')|capitalize }}</strong></span>
+                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Status History Timeline -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-3">
+                <h2 class="text-base font-bold text-slate-800">Status Timeline</h2>
+                <div class="flow-root">
+                    <ul class="-mb-8">
+                        {% for h in histories %}
+                        <li>
+                            <div class="relative pb-6">
+                                {% if not loop.last %}
+                                <span class="absolute top-4 left-3 -ml-px h-full w-0.5 bg-slate-200" aria-hidden="true"></span>
+                                {% endif %}
+                                <div class="relative flex space-x-3">
+                                    <div>
+                                        <span class="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center ring-4 ring-white">
+                                            <span class="h-2 w-2 rounded-full bg-brand-600"></span>
+                                        </span>
+                                    </div>
+                                    <div class="min-w-0 flex-1 pt-0.5">
+                                        <p class="text-xs font-medium text-slate-900">
+                                            {{ h.to_status|replace('_', ' ')|capitalize }}
+                                            {% if h.from_status %}
+                                            <span class="text-[10px] text-slate-400">(from {{ h.from_status }})</span>
+                                            {% endif %}
+                                        </p>
+                                        <p class="text-[10px] text-slate-500 font-mono">{{ h.changed_at|datetime_ist }}</p>
+                                        {% if h.note %}
+                                        <p class="text-xs text-slate-600 mt-1 italic bg-slate-50 p-1.5 rounded">{{ h.note }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Audit Trail (Collapsible) -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <button type="button"
+                        onclick="document.getElementById('audit-body').classList.toggle('hidden')"
+                        class="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 transition">
+                    <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Ticket Audit Log ({{ audits|length }})</span>
+                    <span class="text-xs text-brand-600">Toggle</span>
+                </button>
+                <div id="audit-body" class="hidden p-4 border-t border-slate-100 max-h-72 overflow-y-auto space-y-2 text-xs">
+                    {% for a in audits %}
+                    <div class="p-2 bg-slate-50 rounded border border-slate-100 text-[11px]">
+                        <div class="flex items-center justify-between font-medium text-slate-800">
+                            <span class="uppercase font-mono text-brand-600">{{ a.action }} {{ a.entity }}</span>
+                            <span class="text-slate-400 font-mono">{{ a.timestamp|datetime_ist }}</span>
+                        </div>
+                        {% if a.reason %}
+                        <p class="text-slate-600 mt-0.5">Reason: {{ a.reason }}</p>
+                        {% endif %}
+                        {% if a.changed_fields %}
+                        <pre class="text-[10px] text-slate-500 mt-1 overflow-x-auto">{{ a.changed_fields }}</pre>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delivery Confirmation Dialog -->
+<dialog id="delivery-dialog" class="p-6 rounded-xl shadow-2xl border border-slate-200 max-w-md w-full bg-white">
+    <form method="POST" action="/tickets/{{ ticket.id }}/status" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+        <input type="hidden" name="to_status" value="delivered">
+
+        <h3 class="text-lg font-bold text-slate-900">Confirm Delivery</h3>
+        <p class="text-xs text-slate-500">Hand device back to customer and mark ticket delivered.</p>
+
+        <!-- Balance Info -->
+        <div class="p-3 bg-slate-50 rounded-lg text-xs space-y-1">
+            <div class="flex justify-between">
+                <span>Total Line Items:</span>
+                <span class="font-mono font-medium">{{ items_total|inr }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span>Total Paid:</span>
+                <span class="font-mono font-medium text-emerald-600">{{ net_paid|inr }}</span>
+            </div>
+            <div class="flex justify-between font-bold pt-1 border-t border-slate-200">
+                <span>Balance Due:</span>
+                <span class="font-mono {% if balance_due > 0 %}text-amber-600{% elif balance_due < 0 %}text-emerald-600{% else %}text-slate-700{% endif %}">
+                    {% if balance_due < 0 %}Credit {{ balance_due|abs|inr }}{% else %}{{ balance_due|inr }}{% endif %}
+                </span>
+            </div>
+        </div>
+
+        {% if balance_due != 0 %}
+        <div class="p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
+            {% if balance_due > 0 %}
+            Ticket has an unpaid balance of <strong>{{ balance_due|inr }}</strong>.
+            {% else %}
+            Customer has a credit balance of <strong>{{ balance_due|abs|inr }}</strong>. Consider refunding before delivery.
+            {% endif %}
+            <label class="flex items-center gap-2 mt-2 font-semibold cursor-pointer">
+                <input type="checkbox" name="confirm_pending_balance" value="1" required class="rounded text-brand-600">
+                <span>Confirm delivery with pending balance</span>
+            </label>
+        </div>
+        {% else %}
+        <input type="hidden" name="confirm_pending_balance" value="1">
+        {% endif %}
+
+        <div>
+            <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                <input type="checkbox" name="clear_passcode" value="1" checked class="rounded text-brand-600">
+                <span>Clear device passcode on delivery (recommended)</span>
+            </label>
+        </div>
+
+        <div>
+            <label class="block text-xs font-medium text-slate-700">Delivery Note (Optional)</label>
+            <input type="text" name="note" placeholder="e.g. Handed over to customer" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal('delivery-dialog')" class="px-4 py-2 text-xs text-slate-600 hover:text-slate-900">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded text-xs font-bold transition">Confirm Delivery</button>
+        </div>
+    </form>
+</dialog>
+
+<!-- Delete Ticket Dialog -->
+<dialog id="delete-ticket-dialog" class="p-6 rounded-xl shadow-2xl border border-slate-200 max-w-md w-full bg-white">
+    <form method="POST" action="/tickets/{{ ticket.id }}/delete" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+        <h3 class="text-lg font-bold text-red-600">Delete Ticket</h3>
+        <p class="text-xs text-slate-500">Soft delete ticket. Requires Owner PIN and mandatory reason (min 3 chars). Blocked if active payments exist.</p>
+
+        <div>
+            <label class="block text-xs font-medium text-slate-700">Reason for Deletion *</label>
+            <input type="text" name="reason" required minlength="3" placeholder="e.g. Entered by mistake" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded text-xs">
+        </div>
+
+        <div>
+            <label class="block text-xs font-medium text-slate-700">Owner PIN *</label>
+            <input type="password" name="owner_pin" required placeholder="Owner PIN" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded text-xs font-mono">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal('delete-ticket-dialog')" class="px-4 py-2 text-xs text-slate-600 hover:text-slate-900">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition">Delete Ticket</button>
+        </div>
+    </form>
+</dialog>
+
+<!-- Delete Payment Modal -->
+<dialog id="delete-payment-dialog" class="p-6 rounded-xl shadow-2xl border border-slate-200 max-w-md w-full bg-white">
+    <form id="delete-payment-form" method="POST" action="" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+        <h3 class="text-lg font-bold text-red-600">Delete Payment</h3>
+        <p id="delete-payment-info" class="text-xs text-slate-500"></p>
+
+        <div>
+            <label class="block text-xs font-medium text-slate-700">Reason for Deletion *</label>
+            <input type="text" name="reason" required minlength="3" placeholder="e.g. Incorrect entry or canceled" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded text-xs">
+        </div>
+
+        <div>
+            <label class="block text-xs font-medium text-slate-700">Owner PIN *</label>
+            <input type="password" name="owner_pin" required placeholder="Owner PIN" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded text-xs font-mono">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal('delete-payment-dialog')" class="px-4 py-2 text-xs text-slate-600 hover:text-slate-900">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition">Confirm Delete</button>
+        </div>
+    </form>
+</dialog>
+
+<script>
+function openDeletePaymentModal(paymentId, amountStr) {
+    const form = document.getElementById('delete-payment-form');
+    form.action = `/payments/${paymentId}/delete`;
+    document.getElementById('delete-payment-info').innerText = `Soft delete payment of ${amountStr}. Blocked if day is closed.`;
+    openModal('delete-payment-dialog');
+}
+</script>
+{% endblock %}

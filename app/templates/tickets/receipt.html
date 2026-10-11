@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Receipt {{ ticket.ticket_no }}{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto space-y-6">
+    <!-- Top Action Buttons (Hidden when printing) -->
+    <div class="no-print bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <a href="/tickets/{{ ticket.id }}" class="text-xs text-slate-600 hover:text-slate-900 font-medium flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            Back to Ticket
+        </a>
+
+        <div class="flex items-center gap-2">
+            <a href="{{ whatsapp_url }}"
+               target="_blank"
+               rel="noopener"
+               class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition inline-flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.53 1.77.814 2.79.814 3.181 0 5.767-2.586 5.768-5.766 0-3.18-2.586-5.766-5.767-5.766zm9.969 5.766c0 5.523-4.477 10-10 10-1.748 0-3.393-.45-4.829-1.242l-5.171 1.354 1.378-5.034c-.878-1.488-1.378-3.228-1.378-5.078 0-5.523 4.477-10 10-10s10 4.477 10 10z"/></svg>
+                Send via WhatsApp
+            </a>
+
+            <button type="button"
+                    onclick="window.print()"
+                    class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition inline-flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                Download PDF
+            </button>
+        </div>
+    </div>
+    <div class="no-print text-center text-[11px] text-slate-400 -mt-3">
+        Choose "Save as PDF" in the print window to save digital copy
+    </div>
+
+    <!-- Printable Receipt Container -->
+    <div class="receipt-container bg-white p-6 md:p-8 rounded-xl shadow-md border border-slate-200 text-slate-800 space-y-6">
+        <!-- Header -->
+        <div class="text-center pb-4 border-b border-slate-200">
+            <h1 class="text-xl font-extrabold uppercase tracking-wide text-slate-900">{{ setting.shop_name }}</h1>
+            {% if setting.shop_address %}
+            <p class="text-xs text-slate-500 mt-0.5">{{ setting.shop_address }}</p>
+            {% endif %}
+            {% if setting.shop_phone %}
+            <p class="text-xs text-slate-500 font-mono">Tel: {{ setting.shop_phone }}</p>
+            {% endif %}
+            <div class="mt-3 inline-block px-3 py-1 bg-slate-100 rounded text-xs font-mono font-bold text-slate-800">
+                REPAIR INTAKE RECEIPT
+            </div>
+        </div>
+
+        <!-- Ticket & Date Info -->
+        <div class="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
+            <div>
+                <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Ticket Number</span>
+                <span class="font-mono font-bold text-base text-brand-600">{{ ticket.ticket_no }}</span>
+            </div>
+            <div class="text-right">
+                <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Date & Time</span>
+                <span class="font-medium text-slate-700">{{ ticket.received_at|datetime_ist }}</span>
+            </div>
+        </div>
+
+        <!-- Customer & Device -->
+        <div class="grid grid-cols-2 gap-4 text-xs pb-4 border-b border-slate-100">
+            <div>
+                <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Customer</span>
+                <span class="font-bold text-slate-900 text-sm block">{{ ticket.customer.name }}</span>
+                <span class="text-slate-500 font-mono">{{ ticket.customer.phone }}</span>
+            </div>
+            <div class="text-right">
+                <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Device</span>
+                <span class="font-bold text-slate-900 text-sm block">{{ ticket.device_brand }} {{ ticket.device_model }}</span>
+                {% if ticket.color %}<span class="text-slate-500 block">{{ ticket.color }}</span>{% endif %}
+                {% if ticket.imei_or_serial %}<span class="text-slate-400 font-mono text-[11px] block">IMEI: {{ ticket.imei_or_serial }}</span>{% endif %}
+            </div>
+        </div>
+
+        <!-- Issue & Intake Condition -->
+        <div class="text-xs space-y-2 pb-4 border-b border-slate-100">
+            <div>
+                <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Reported Issue</span>
+                <p class="font-medium text-slate-800 bg-slate-50 p-2.5 rounded border border-slate-100 mt-1">
+                    {{ ticket.reported_issue }}
+                </p>
+            </div>
+
+            {% if ticket.intake_condition %}
+            <div class="pt-2">
+                <span class="text-slate-400 block uppercase tracking-wider text-[10px] mb-1">Intake Condition</span>
+                <div class="grid grid-cols-2 gap-1 text-[11px] text-slate-600">
+                    <div>Screen Cracked: <strong>{{ "Yes" if ticket.intake_condition.screen_cracked else "No" }}</strong></div>
+                    <div>Powers On: <strong>{{ "Yes" if ticket.intake_condition.powers_on else "No" }}</strong></div>
+                    <div>Water Damage: <strong>{{ "Yes" if ticket.intake_condition.water_damage_indicator else "No" }}</strong></div>
+                    <div>Back Cover: <strong>{{ "Damaged" if ticket.intake_condition.back_cover_damaged else "OK" }}</strong></div>
+                    <div>SIM Left: <strong>{{ "Yes" if ticket.intake_condition.sim_left else "No" }}</strong></div>
+                    <div>Memory Card: <strong>{{ "Yes" if ticket.intake_condition.memory_card_left else "No" }}</strong></div>
+                    <div>Charger/Acc: <strong>{{ "Yes" if ticket.intake_condition.charger_accessories_received else "No" }}</strong></div>
+                </div>
+                {% if ticket.intake_condition.accessories_note %}
+                <p class="text-[11px] text-slate-500 mt-1 italic">Acc Note: {{ ticket.intake_condition.accessories_note }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Financial Summary -->
+        <div class="text-xs space-y-2 pb-4 border-b border-slate-100">
+            {% if ticket.estimate_amount %}
+            <div class="flex justify-between text-slate-600">
+                <span>Estimated Cost:</span>
+                <span class="font-mono font-medium">{{ ticket.estimate_amount|inr }}</span>
+            </div>
+            {% endif %}
+
+            {% if items_total > 0 %}
+            <div class="flex justify-between text-slate-600">
+                <span>Total Line Items:</span>
+                <span class="font-mono font-medium">{{ items_total|inr }}</span>
+            </div>
+            {% endif %}
+
+            <div class="flex justify-between text-slate-700">
+                <span>Amount Paid (Advance / Net):</span>
+                <span class="font-mono font-bold text-emerald-600">{{ net_paid|inr }}</span>
+            </div>
+
+            <div class="flex justify-between text-sm font-extrabold text-slate-900 pt-1 border-t border-slate-100">
+                <span>Balance Due:</span>
+                <span class="font-mono {% if balance_due > 0 %}text-slate-900{% elif balance_due < 0 %}text-emerald-600{% else %}text-slate-500{% endif %}">
+                    {% if balance_due < 0 %}Credit {{ balance_due|abs|inr }}{% else %}{{ balance_due|inr }}{% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- Inline SVG QR Code -->
+        <div class="flex flex-col items-center justify-center py-2 text-center">
+            <div class="w-36 h-36 flex items-center justify-center p-2 bg-white border border-slate-200 rounded-lg">
+                {{ qr_svg|safe }}
+            </div>
+            <span class="font-mono text-xs font-bold text-slate-600 mt-2 tracking-widest">{{ ticket.ticket_no }}</span>
+            <span class="text-[10px] text-slate-400">Scan QR to identify ticket quickly</span>
+        </div>
+
+        <!-- Terms & Conditions -->
+        <div class="pt-2 border-t border-slate-200 text-[10px] text-slate-500 leading-relaxed space-y-1">
+            <span class="font-bold uppercase tracking-wider block text-slate-700">Terms & Conditions:</span>
+            <p>{{ setting.receipt_terms_text }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

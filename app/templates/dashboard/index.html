@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Dashboard{% endblock %}
+
+{% block head_extra %}
+<!-- Chart.js 4.4.4 CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header & Date Controls -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Analytics & Insights</h1>
+            <p class="text-xs text-slate-500 mt-0.5">
+                Period: <strong>{{ from_date|date_ist }}</strong> to <strong>{{ to_date|date_ist }}</strong>
+                (Compared to previous {{ (to_date - from_date).days + 1 }} days)
+            </p>
+        </div>
+
+        <!-- Presets and Custom Range Form -->
+        <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs">
+                <a href="/dashboard?preset=this_month"
+                   class="px-3 py-1.5 rounded-md font-semibold transition {% if active_preset == 'this_month' %}bg-white text-slate-900 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    This Month
+                </a>
+                <a href="/dashboard?preset=last_month"
+                   class="px-3 py-1.5 rounded-md font-semibold transition {% if active_preset == 'last_month' %}bg-white text-slate-900 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    Last Month
+                </a>
+            </div>
+
+            <!-- Custom Form -->
+            <form method="GET" action="/dashboard" class="flex items-center gap-1.5 text-xs">
+                <input type="date" name="from" value="{{ from_date.isoformat() }}" required class="px-2 py-1.5 border border-slate-300 rounded-lg">
+                <span class="text-slate-400">to</span>
+                <input type="date" name="to" value="{{ to_date.isoformat() }}" required class="px-2 py-1.5 border border-slate-300 rounded-lg">
+                <button type="submit" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-medium transition">
+                    Filter
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4 Main Headline KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Gross Revenue -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Gross Revenue</span>
+            <span class="font-mono text-2xl font-extrabold text-slate-900 mt-1 block">{{ rep.gross_revenue|inr }}</span>
+            <div class="mt-2 text-xs flex items-center justify-between">
+                <span class="text-slate-400">Prev: {{ prev_rep.gross_revenue|inr }}</span>
+                <span class="font-semibold {% if '+' in comparisons.gross_revenue %}text-emerald-600{% elif '-' in comparisons.gross_revenue %}text-red-600{% else %}text-slate-500{% endif %}">
+                    {{ comparisons.gross_revenue }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Billed Value -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Billed Value</span>
+            <span class="font-mono text-2xl font-extrabold text-slate-900 mt-1 block">{{ rep.billed_value|inr }}</span>
+            <div class="mt-2 text-xs flex items-center justify-between">
+                <span class="text-slate-400">Prev: {{ prev_rep.billed_value|inr }}</span>
+                <span class="font-semibold {% if '+' in comparisons.billed_value %}text-emerald-600{% elif '-' in comparisons.billed_value %}text-red-600{% else %}text-slate-500{% endif %}">
+                    {{ comparisons.billed_value }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Parts Cost -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Parts Cost</span>
+            <span class="font-mono text-2xl font-extrabold text-slate-900 mt-1 block">{{ rep.parts_cost|inr }}</span>
+            <div class="mt-2 text-xs flex items-center justify-between">
+                <span class="text-slate-400">Prev: {{ prev_rep.parts_cost|inr }}</span>
+                <span class="font-semibold text-slate-600">{{ comparisons.parts_cost }}</span>
+            </div>
+        </div>
+
+        <!-- Gross Margin (Exact Label Required) -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Gross Margin</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="font-mono text-2xl font-extrabold text-emerald-600">{{ rep.gross_margin_rupees|inr }}</span>
+                <span class="text-xs font-bold text-slate-600">({{ rep.gross_margin_pct }}%)</span>
+            </div>
+            <div class="mt-2 text-xs flex items-center justify-between">
+                <span class="text-slate-400">Prev: {{ prev_rep.gross_margin_rupees|inr }}</span>
+                <span class="font-semibold text-emerald-600">{{ comparisons.gross_margin_rupees }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Secondary Operational KPIs -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Devices Serviced</span>
+            <span class="font-mono text-xl font-bold text-slate-900 mt-1 block">{{ rep.devices_serviced }}</span>
+            <span class="text-xs text-slate-400 mt-1 block">Prev: {{ prev_rep.devices_serviced }} ({{ comparisons.devices_serviced }})</span>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Avg Turnaround</span>
+            <span class="font-mono text-xl font-bold text-slate-900 mt-1 block">{{ rep.avg_turnaround_hours }} hrs</span>
+            <span class="text-xs text-slate-400 mt-1 block">Prev: {{ prev_rep.avg_turnaround_hours }} hrs ({{ comparisons.avg_turnaround_hours }})</span>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Avg Pickup Delay</span>
+            <span class="font-mono text-xl font-bold text-slate-900 mt-1 block">{{ rep.avg_pickup_delay_hours }} hrs</span>
+            <span class="text-xs text-slate-400 mt-1 block">Waiting ready to delivered</span>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Fix Success Rate</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="font-mono text-xl font-bold text-slate-900">{{ rep.fix_success_rate }}%</span>
+                <span class="text-xs text-slate-500">({{ rep.repaired_without_warranty_return }}/{{ rep.devices_serviced }})</span>
+            </div>
+            <div class="text-[11px] text-slate-400 mt-1">
+                Declined: {{ rep.declined_count }} • Unrepairable: {{ rep.unrepairable_count }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 1: Daily Revenue Trend & Payment Modes -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Daily Trend Line Chart -->
+        <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h2 class="text-sm font-bold text-slate-800">Daily Net Revenue Trend</h2>
+                <a href="/dashboard/export/daily_revenue.csv?from={{ from_date.isoformat() }}&to={{ to_date.isoformat() }}"
+                   class="text-xs text-brand-600 hover:underline font-semibold">
+                    Export CSV
+                </a>
+            </div>
+            <div class="h-64">
+                <canvas id="dailyRevenueChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Payment Modes Doughnut Chart -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h2 class="text-sm font-bold text-slate-800">Payment Modes</h2>
+            </div>
+            <div class="h-48 flex items-center justify-center">
+                <canvas id="paymentModesChart"></canvas>
+            </div>
+            <div class="text-xs text-slate-600 space-y-1.5 pt-2 border-t border-slate-100">
+                <div class="flex justify-between">
+                    <span>Cash:</span>
+                    <span class="font-mono font-bold">{{ rep.mode_totals.cash|inr }} ({{ rep.mode_percentages.cash }}%)</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Card:</span>
+                    <span class="font-mono font-bold">{{ rep.mode_totals.card|inr }} ({{ rep.mode_percentages.card }}%)</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>UPI:</span>
+                    <span class="font-mono font-bold">{{ rep.mode_totals.upi|inr }} ({{ rep.mode_percentages.upi }}%)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 2: Top Brands & Issues -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h2 class="text-sm font-bold text-slate-800">Top Brands</h2>
+                <a href="/dashboard/export/brands.csv?from={{ from_date.isoformat() }}&to={{ to_date.isoformat() }}" class="text-xs text-brand-600 hover:underline font-semibold">Export CSV</a>
+            </div>
+            <div class="h-56">
+                <canvas id="topBrandsChart"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h2 class="text-sm font-bold text-slate-800">Top Recurring Faults</h2>
+                <a href="/dashboard/export/issues.csv?from={{ from_date.isoformat() }}&to={{ to_date.isoformat() }}" class="text-xs text-brand-600 hover:underline font-semibold">Export CSV</a>
+            </div>
+            <div class="h-56">
+                <canvas id="topIssuesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tables Row: Most-Bought Parts & Cash Variance History -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Most Bought Parts -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-6 border-b border-slate-200 flex items-center justify-between">
+                <h2 class="text-sm font-bold text-slate-800">Most-Bought Spare Parts</h2>
+                <a href="/dashboard/export/parts.csv?from={{ from_date.isoformat() }}&to={{ to_date.isoformat() }}"
+                   class="text-xs text-brand-600 hover:underline font-semibold">
+                    Export CSV
+                </a>
+            </div>
+
+            {% if rep.most_bought_parts %}
+            <div class="overflow-x-auto max-h-60 overflow-y-auto">
+                <table class="w-full text-left text-xs text-slate-600">
+                    <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2">Part Description</th>
+                            <th class="px-4 py-2 text-right">Units</th>
+                            <th class="px-4 py-2 text-right">Total Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-mono">
+                        {% for p in rep.most_bought_parts %}
+                        <tr class="hover:bg-slate-50 font-sans">
+                            <td class="px-4 py-2 font-medium text-slate-900">{{ p.description }}</td>
+                            <td class="px-4 py-2 text-right font-mono">{{ p.count }}</td>
+                            <td class="px-4 py-2 text-right font-mono font-bold">{{ p.total_cost|inr }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-8 text-center text-slate-400 text-xs italic">No parts recorded for delivered tickets in this range.</div>
+            {% endif %}
+        </div>
+
+        <!-- Cash Variance History Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-6 border-b border-slate-200 flex items-center justify-between">
+                <h2 class="text-sm font-bold text-slate-800">Cash Variance History</h2>
+                <a href="/dashboard/export/variance.csv?from={{ from_date.isoformat() }}&to={{ to_date.isoformat() }}"
+                   class="text-xs text-brand-600 hover:underline font-semibold">
+                    Export CSV
+                </a>
+            </div>
+
+            {% if rep.variance_history %}
+            <div class="overflow-x-auto max-h-60 overflow-y-auto">
+                <table class="w-full text-left text-xs text-slate-600">
+                    <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2">Date</th>
+                            <th class="px-4 py-2 text-right">Expected</th>
+                            <th class="px-4 py-2 text-right">Counted</th>
+                            <th class="px-4 py-2 text-right">Variance</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-mono">
+                        {% for v in rep.variance_history %}
+                        <tr class="hover:bg-slate-50 font-sans">
+                            <td class="px-4 py-2 font-medium text-slate-900">{{ v.date }}</td>
+                            <td class="px-4 py-2 text-right font-mono">{{ v.expected|inr }}</td>
+                            <td class="px-4 py-2 text-right font-mono font-bold">{{ v.counted|inr }}</td>
+                            <td class="px-4 py-2 text-right font-mono font-bold {% if v.variance == 0 %}text-emerald-600{% elif v.variance < 0 %}text-red-600{% else %}text-amber-600{% endif %}">
+                                {% if v.variance > 0 %}+{% endif %}{{ v.variance|inr }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-8 text-center text-slate-400 text-xs italic">No cash closings in this range.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+const chartData = {{ chart_json|safe }};
+
+// 1. Daily Revenue Chart
+if (document.getElementById('dailyRevenueChart')) {
+    new Chart(document.getElementById('dailyRevenueChart'), {
+        type: 'line',
+        data: {
+            labels: chartData.daily_labels,
+            datasets: [{
+                label: 'Net Revenue (₹)',
+                data: chartData.daily_values,
+                borderColor: '#0284c7',
+                backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                tension: 0.2,
+                fill: true,
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+// 2. Payment Modes Doughnut Chart
+if (document.getElementById('paymentModesChart')) {
+    new Chart(document.getElementById('paymentModesChart'), {
+        type: 'doughnut',
+        data: {
+            labels: chartData.modes_labels,
+            datasets: [{
+                data: chartData.modes_values,
+                backgroundColor: ['#10b981', '#a855f7', '#3b82f6'],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12 } }
+            }
+        }
+    });
+}
+
+// 3. Top Brands Horizontal Bar
+if (document.getElementById('topBrandsChart')) {
+    new Chart(document.getElementById('topBrandsChart'), {
+        type: 'bar',
+        data: {
+            labels: chartData.brands_labels,
+            datasets: [{
+                label: 'Repairs',
+                data: chartData.brands_values,
+                backgroundColor: '#3b82f6',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+// 4. Top Issues Horizontal Bar
+if (document.getElementById('topIssuesChart')) {
+    new Chart(document.getElementById('topIssuesChart'), {
+        type: 'bar',
+        data: {
+            labels: chartData.issues_labels,
+            datasets: [{
+                label: 'Faults',
+                data: chartData.issues_values,
+                backgroundColor: '#f59e0b',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+</script>
+{% endblock %}
