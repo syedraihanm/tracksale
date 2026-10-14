@@ -258,3 +258,64 @@ def test_inventory_web_routes(client, temp_db):
     assert stock_resp.status_code == 303
     temp_db.refresh(spare)
     assert spare.quantity == 3
+
+
+def test_inventory_audit_and_trigger_protection(temp_db):
+    from sqlalchemy import text
+
+    from app.models.audit_log import AuditLog
+
+    # Create inventory item with quantity 3
+    inv = add_inventory_item(
+        db=temp_db,
+        spare_type="display",
+        model="Galaxy S20",
+        quantity=3,
+        cost_price=1500,
+        selling_price=2500,
+    )
+    assert inv.quantity == 3
+
+    t = create_ticket(
+        db=temp_db,
+        customer_phone="9988776655",
+        customer_name="Pooja Patel",
+        device_brand="Samsung",
+        device_model="Galaxy S20",
+        reported_issue="Blank Screen",
+    )
+
+    # Attach it as a part line item -> quantity becomes 2
+    item = add_item(
+        db=temp_db,
+        ticket=t,
+        item_type="part",
+        description="Display Replacement",
+        price_charged=2500,
+        inventory_item_id=inv.id,
+    )
+    temp_db.refresh(inv)
+    assert inv.quantity == 2
+
+    # Soft-delete line item -> quantity becomes 3 and audit_log recorded
+    delete_item(db=temp_db, item=item)
+    temp_db.refresh(inv)
+    assert inv.quantity == 3
+
+    # Check audit log contains record for inventory stock adjustment
+    audits = (
+        temp_db.query(AuditLog)
+        .filter(AuditLog.entity == "inventory", AuditLog.entity_id == inv.id)
+        .all()
+    )
+    assert len(audits) >= 2  # create + adjust
+    actions = [a.action for a in audits]
+    assert "create" in actions
+    assert "update" in actions
+
+    # Attempt to hard-delete inventory item via raw SQL -> trigger must abort
+    with pytest.raises(Exception, match="Hard delete is forbidden on inventory_items"):
+        temp_db.execute(text("DELETE FROM inventory_items WHERE id = :id"), {"id": inv.id})
+        temp_db.commit()
+    temp_db.rollback()
+

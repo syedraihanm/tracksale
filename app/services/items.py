@@ -179,8 +179,10 @@ def delete_item(
 ) -> TicketItem:
     """Soft delete an item."""
     current_time = now or utc_now()
-    ticket = item.ticket
+    if item.is_deleted:
+        return item
 
+    ticket = item.ticket
     if ticket.status == TicketStatus.DELIVERED.value:
         setting = db.query(SettingsModel).filter_by(id=1).first()
         if not owner_pin or not setting or not setting.owner_pin_hash or not verify_secret(setting.owner_pin_hash, owner_pin.strip()):

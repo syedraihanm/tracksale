@@ -66,6 +66,7 @@ def ticket_new(
 
 
 @router.post("", dependencies=[Depends(verify_csrf)])
+@router.post("/new", dependencies=[Depends(verify_csrf)], include_in_schema=False)
 async def ticket_create(
     request: Request,
     customer_phone: str = Form(...),
@@ -354,6 +355,7 @@ def ticket_soft_delete(
 
 
 @router.post("/{id}/passcode/reveal", dependencies=[Depends(verify_csrf)])
+@router.post("/{id}/reveal-passcode", dependencies=[Depends(verify_csrf)], include_in_schema=False)
 def ticket_reveal_passcode(request: Request, id: int, db: Session = Depends(get_db)):
     ticket = db.query(Ticket).filter_by(id=id, is_deleted=False).first()
     if not ticket:

@@ -49,6 +49,7 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/backup/run", dependencies=[Depends(verify_csrf)])
+@router.post("/backup-now", dependencies=[Depends(verify_csrf)], include_in_schema=False)
 def run_backup_now():
     try:
         create_backup()

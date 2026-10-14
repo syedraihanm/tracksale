@@ -48,3 +48,63 @@ def test_backup_pruning():
 
         backups_after = list(backup_dir.glob("shop-*.db"))
         assert len(backups_after) == 30
+
+
+def test_wal_safe_restore():
+    from app.services.backup import restore_backup_file
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        db_path = temp_path / "live.db"
+        backup_dir = temp_path / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1. Initialize SQLite database in WAL mode
+        conn1 = sqlite3.connect(str(db_path))
+        try:
+            conn1.execute("PRAGMA journal_mode=WAL;")
+            conn1.execute("CREATE TABLE test_data (id INTEGER PRIMARY KEY, val TEXT);")
+            conn1.execute("INSERT INTO test_data (val) VALUES ('initial_state');")
+            conn1.commit()
+        finally:
+            conn1.close()
+
+        # 2. Create online backup of initial state
+        backup_file = create_backup(src_path=db_path, backup_dir=backup_dir)
+        assert backup_file.exists()
+
+        # 3. Mutate live database with new data so WAL frames exist
+        conn2 = sqlite3.connect(str(db_path))
+        try:
+            conn2.execute("INSERT INTO test_data (val) VALUES ('mutated_state');")
+            conn2.commit()
+        finally:
+            conn2.close()
+
+        # Create dummy sidecar files to test removal
+        wal_file = Path(f"{db_path}-wal")
+        shm_file = Path(f"{db_path}-shm")
+        wal_file.touch(exist_ok=True)
+        shm_file.touch(exist_ok=True)
+        assert wal_file.exists()
+
+        # 4. Invoke restore_backup_file
+        restore_backup_file(backup_path=backup_file, target_db_path=db_path)
+
+        # Assert wal and shm files were safely cleaned up
+        assert not wal_file.exists()
+        assert not shm_file.exists()
+
+        # Verify integrity and content of restored database
+        conn3 = sqlite3.connect(str(db_path))
+        try:
+            res = conn3.execute("PRAGMA integrity_check;").fetchone()
+            assert res[0] == "ok"
+
+            rows = conn3.execute("SELECT val FROM test_data;").fetchall()
+            assert len(rows) == 1
+            assert rows[0][0] == "initial_state"
+        finally:
+            conn3.close()
+
+

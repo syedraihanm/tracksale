@@ -34,3 +34,5 @@ This document records the architectural decisions, assumptions, and trade-offs m
 | A-28 | Single-row `settings` also stores admin password hash, ticket sequence, and message templates | Avoids an extra users table for a single login |
 | A-29 | Settings page ships in Phase 1 with Backups only; forms arrive in Phase 2 | Phase order in client doc |
 | A-30 | Phone validated as 10 digits only (no 6-9 first-digit rule) | Follows the client wording exactly |
+| A-31 | Optional spare-parts inventory table (`inventory_items`) linked via `ticket_items.inventory_item_id` | Supports tracking in-stock spare parts with automatic deduction/restoration while still allowing ad-hoc per-job parts (`inventory_item_id=NULL`) |
+

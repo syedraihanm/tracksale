@@ -93,6 +93,11 @@ Open **[http://localhost:8000](http://localhost:8000)** in your browser.
    - Append-only `audit_log` with SQLite trigger forbidding `UPDATE` and `DELETE`.
    - Automated nightly online backups using `sqlite3.backup()` with 30-day retention pruning.
 
+9. **Spare Parts Inventory Management**:
+   - In-stock spare parts catalog (displays, batteries, charging ports, backdoors, motherboards, etc.) with real-time quantities.
+   - Cost price, selling price, and supplier tracking with stock adjustment history.
+   - Automatic stock deduction when assigned to a repair ticket, and automatic replenishment when a stock-linked line item is deleted.
+
 ---
 
 ## 🧪 Testing Suite & Quality Verification
@@ -146,12 +151,22 @@ schtasks /create /tn "MobileRepairShop_NightlyBackup" /tr "powershell -Command \
 ### Disaster Recovery / Database Restore
 To restore from a backup:
 1. Stop the application server (`uvicorn`).
-2. Navigate to `data/` and copy the desired backup file from `backups/shop-YYYYMMDD-HHMMSS.db` over `data/shop.db`.
-3. Verify integrity:
+2. Remove any existing WAL and SHM sidecar files to prevent frame replay mismatch:
+   ```bash
+   rm -f data/shop.db-wal data/shop.db-shm
+   ```
+   *(On Windows PowerShell: `Remove-Item -Force data\shop.db-wal, data\shop.db-shm -ErrorAction SilentlyContinue`)*
+3. Copy the desired backup file over `data/shop.db`:
+   ```bash
+   cp backups/shop-YYYYMMDD-HHMMSS.db data/shop.db
+   ```
+4. Verify database integrity:
    ```bash
    sqlite3 data/shop.db "PRAGMA integrity_check;"
    ```
-4. Start the application server.
+5. Start the application server.
+
+*(Alternatively, use the safe Python restore helper: `uv run python -c "from pathlib import Path; from app.services.backup import restore_backup_file; restore_backup_file(Path('backups/shop-YYYYMMDD-HHMMSS.db'))"`)*
 
 ---
 

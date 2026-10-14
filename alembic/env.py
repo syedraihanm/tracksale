@@ -11,8 +11,12 @@ from app.db import Base
 # access to the values within the .ini file in use.
 config = context.config
 
-settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+current_url = config.get_main_option("sqlalchemy.url")
+if not current_url or current_url.startswith("driver://"):
+    settings = get_settings()
+    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
+
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:

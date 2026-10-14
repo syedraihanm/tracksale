@@ -64,21 +64,45 @@ class RateLimiter:
         self.attempts: dict[str, list[float]] = {}
         self.lockouts: dict[str, float] = {}
 
+    def _prune_expired(self, now: float) -> None:
+        cutoff = now - self.window_seconds
+        # Clean expired lockouts
+        expired_lockouts = [k for k, v in self.lockouts.items() if v <= now]
+        for k in expired_lockouts:
+            self.lockouts.pop(k, None)
+            self.attempts.pop(k, None)
+
+        # Clean empty or stale attempt buckets
+        stale_keys = [k for k, v in self.attempts.items() if not [t for t in v if t > cutoff]]
+        for k in stale_keys:
+            self.attempts.pop(k, None)
+
+        # Bound maximum tracked keys to 1,000
+        if len(self.attempts) > 1000:
+            excess = len(self.attempts) - 1000
+            for k in list(self.attempts.keys())[:excess]:
+                self.attempts.pop(k, None)
+        if len(self.lockouts) > 1000:
+            excess = len(self.lockouts) - 1000
+            for k in list(self.lockouts.keys())[:excess]:
+                self.lockouts.pop(k, None)
+
     def is_locked(self, key: str, now_ts: float | None = None) -> tuple[bool, int]:
         now = now_ts or datetime.now(UTC).timestamp()
+        self._prune_expired(now)
         locked_until = self.lockouts.get(key)
         if locked_until:
             if now < locked_until:
                 remaining = int(locked_until - now) + 1
                 return True, remaining
             else:
-                del self.lockouts[key]
+                self.lockouts.pop(key, None)
                 self.attempts[key] = []
         return False, 0
 
     def record_failure(self, key: str, now_ts: float | None = None) -> tuple[bool, int]:
         now = now_ts or datetime.now(UTC).timestamp()
-        # Clean old attempts
+        self._prune_expired(now)
         cutoff = now - self.window_seconds
         current = [t for t in self.attempts.get(key, []) if t > cutoff]
         current.append(now)

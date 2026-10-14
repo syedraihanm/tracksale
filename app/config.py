@@ -1,7 +1,15 @@
 from functools import lru_cache
 from pathlib import Path
 
+from cryptography.fernet import Fernet
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+INSECURE_DEFAULT_KEYS: set[str] = {
+    "change-this-in-production-use-scripts-gen-key-py",
+    "dev-insecure-secret-key-must-override-in-prod-12345678",
+    "PH_13btabNyspTjWnDstwe9GTl3rMAEREI71jCXTQbA=",
+}
 
 
 class Settings(BaseSettings):
@@ -28,10 +36,28 @@ class Settings(BaseSettings):
         p.mkdir(parents=True, exist_ok=True)
         return p
 
+    @model_validator(mode="after")
+    def validate_secrets(self) -> "Settings":
+        try:
+            Fernet(self.PASSCODE_ENCRYPTION_KEY.encode())
+        except Exception as e:
+            raise ValueError(
+                "PASSCODE_ENCRYPTION_KEY must be a valid 32-byte urlsafe base64 Fernet key. Run: uv run python scripts/gen_key.py"
+            ) from e
+
+        if self.is_production:
+            if (
+                len(self.SECRET_KEY) < 32
+                or self.SECRET_KEY in INSECURE_DEFAULT_KEYS
+                or "dev-insecure" in self.SECRET_KEY
+            ):
+                raise ValueError("Production requires a strong SECRET_KEY (>= 32 chars) not matching default/example keys.")
+            if self.PASSCODE_ENCRYPTION_KEY in INSECURE_DEFAULT_KEYS:
+                raise ValueError("Production requires a unique PASSCODE_ENCRYPTION_KEY not matching default/example keys.")
+
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:
-    settings = Settings()
-    if settings.is_production and ("dev-insecure" in settings.SECRET_KEY or len(settings.SECRET_KEY) < 16):
-        raise ValueError("SECRET_KEY must be securely configured in production")
-    return settings
+    return Settings()

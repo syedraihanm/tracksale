@@ -159,3 +159,42 @@ def cash_reopen_post(
         raise HTTPException(status_code=422, detail=str(e))
 
     return RedirectResponse(url=f"/cash?date={date_str}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/close", dependencies=[Depends(verify_csrf)], include_in_schema=False)
+def cash_close_alias(
+    request: Request,
+    opening_cash: str = Form(...),
+    counted_cash: str = Form(...),
+    date_str: str | None = Form(None),
+    note: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    d_str = date_str or business_date().isoformat()
+    return cash_close_post(
+        request=request,
+        date_str=d_str,
+        opening_cash=opening_cash,
+        counted_cash=counted_cash,
+        note=note,
+        db=db,
+    )
+
+
+@router.post("/reopen", dependencies=[Depends(verify_csrf)], include_in_schema=False)
+def cash_reopen_alias(
+    request: Request,
+    owner_pin: str = Form(...),
+    reason: str = Form(...),
+    date_str: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    d_str = date_str or business_date().isoformat()
+    return cash_reopen_post(
+        request=request,
+        date_str=d_str,
+        owner_pin=owner_pin,
+        reason=reason,
+        db=db,
+    )
+

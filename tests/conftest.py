@@ -99,6 +99,15 @@ def temp_db():
             END;
             """)
         )
+        conn.execute(
+            text("""
+            CREATE TRIGGER trg_no_delete_inventory_items
+            BEFORE DELETE ON inventory_items
+            BEGIN
+                SELECT RAISE(ABORT, 'Hard delete is forbidden on inventory_items; use soft delete');
+            END;
+            """)
+        )
         conn.commit()
 
 

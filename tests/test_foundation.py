@@ -134,3 +134,113 @@ def test_triggers_prevent_hard_deletes(temp_db):
         temp_db.execute(text("DELETE FROM audit_log WHERE id = :id"), {"id": audit.id})
         temp_db.commit()
     temp_db.rollback()
+
+
+def test_settings_secret_validation():
+    from cryptography.fernet import Fernet
+    from pydantic import ValidationError
+
+    from app.config import Settings
+
+    # Invalid Fernet key raises ValidationError/ValueError
+    with pytest.raises(ValidationError):
+        Settings(PASSCODE_ENCRYPTION_KEY="not-a-valid-fernet-key")
+
+    valid_key = Fernet.generate_key().decode()
+
+    # Production mode with default/weak secret raises ValidationError
+    with pytest.raises(ValidationError):
+        Settings(
+            APP_ENV="production",
+            SECRET_KEY="change-this-in-production-use-scripts-gen-key-py",
+            PASSCODE_ENCRYPTION_KEY=valid_key,
+        )
+
+    # Production mode with short secret key raises ValidationError
+    with pytest.raises(ValidationError):
+        Settings(
+            APP_ENV="production",
+            SECRET_KEY="too-short",
+            PASSCODE_ENCRYPTION_KEY=valid_key,
+        )
+
+    # Production mode with insecure default passcode encryption key raises ValidationError
+    with pytest.raises(ValidationError):
+        Settings(
+            APP_ENV="production",
+            SECRET_KEY="a-very-strong-production-secret-key-32-chars-min",
+            PASSCODE_ENCRYPTION_KEY="PH_13btabNyspTjWnDstwe9GTl3rMAEREI71jCXTQbA=",
+        )
+
+    # Valid production settings pass
+    valid_settings = Settings(
+        APP_ENV="production",
+        SECRET_KEY="a-very-strong-production-secret-key-32-chars-min",
+        PASSCODE_ENCRYPTION_KEY=valid_key,
+    )
+    assert valid_settings.is_production is True
+
+
+def test_alembic_migrations_and_zero_drift(tmp_path):
+    from alembic.autogenerate import compare_metadata
+    from alembic.config import Config
+    from alembic.migration import MigrationContext
+    from sqlalchemy import create_engine, inspect, text
+
+    from alembic import command
+    from app.db import Base
+
+    db_file = tmp_path / "mig_test.db"
+    db_url = f"sqlite:///{db_file}"
+
+    alembic_cfg = Config("alembic.ini")
+    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+
+    # Run upgrade head
+    command.upgrade(alembic_cfg, "head")
+
+    engine = create_engine(db_url)
+    inspector = inspect(engine)
+
+    expected_tables = {
+        "settings",
+        "customers",
+        "tickets",
+        "ticket_items",
+        "payments",
+        "status_history",
+        "cash_closings",
+        "audit_log",
+        "inventory_items",
+    }
+    actual_tables = set(inspector.get_table_names())
+    assert expected_tables.issubset(actual_tables), f"Missing tables: {expected_tables - actual_tables}"
+
+    # Verify ticket_items has inventory_item_id
+    cols = {c["name"] for c in inspector.get_columns("ticket_items")}
+    assert "inventory_item_id" in cols
+
+    # Verify zero diff against Base.metadata
+    with engine.connect() as conn:
+        mc = MigrationContext.configure(conn)
+        diff = compare_metadata(mc, Base.metadata)
+        table_or_col_diffs = [
+            d for d in diff if d[0] in ("add_table", "remove_table", "add_column", "remove_column")
+        ]
+        assert table_or_col_diffs == [], f"Schema drift detected: {diff}"
+
+        # Verify anti-delete trigger on inventory_items
+        conn.execute(
+            text(
+                "INSERT INTO inventory_items (id, spare_type, model, quantity, cost_price, selling_price, is_deleted, created_at, updated_at) "
+                "VALUES (1, 'Screen', 'Pixel 7', 5, 2000, 3500, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            )
+        )
+        conn.commit()
+
+        with pytest.raises(Exception, match="Hard delete is forbidden on inventory_items"):
+            conn.execute(text("DELETE FROM inventory_items WHERE id = 1"))
+            conn.commit()
+    engine.dispose()
+
+

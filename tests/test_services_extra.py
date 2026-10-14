@@ -391,3 +391,133 @@ def test_autocomplete_html_response(temp_db):
         assert not resp_models.text.startswith('"')
     finally:
         app.dependency_overrides.clear()
+
+
+def test_inventory_service_validations(temp_db):
+    from app.services.inventory import (
+        add_inventory_item,
+        adjust_inventory_stock,
+        delete_inventory_item,
+        edit_inventory_item,
+        get_available_spares,
+        list_inventory,
+    )
+
+    # Empty spare type
+    with pytest.raises(ValidationFailed, match="Spare type/category is required"):
+        add_inventory_item(temp_db, spare_type="", model="Pixel 7")
+
+    # Long model
+    with pytest.raises(ValidationFailed, match="between 1 and 100"):
+        add_inventory_item(temp_db, spare_type="screen", model="x" * 101)
+
+    # Negative quantity
+    with pytest.raises(ValidationFailed, match="Quantity cannot be negative"):
+        add_inventory_item(temp_db, spare_type="screen", model="Pixel 7", quantity=-1)
+
+    # Invalid cost price
+    with pytest.raises(ValidationFailed, match="Cost price"):
+        add_inventory_item(temp_db, spare_type="screen", model="Pixel 7", cost_price=-5)
+
+    with pytest.raises(ValidationFailed, match="Cost price"):
+        add_inventory_item(temp_db, spare_type="screen", model="Pixel 7", cost_price=10_00_001)
+
+    # Invalid selling price
+    with pytest.raises(ValidationFailed, match="Selling price"):
+        add_inventory_item(temp_db, spare_type="screen", model="Pixel 7", selling_price=-5)
+
+    with pytest.raises(ValidationFailed, match="Selling price"):
+        add_inventory_item(temp_db, spare_type="screen", model="Pixel 7", selling_price=10_00_001)
+
+    # Valid item
+    item = add_inventory_item(temp_db, spare_type="screen", model="Pixel 7", quantity=2)
+
+    # In stock filter & model filter
+    assert len(list_inventory(temp_db, in_stock_only=True)) >= 1
+    assert len(get_available_spares(temp_db, model="Pixel")) >= 1
+
+    # Edit validations
+    with pytest.raises(ValidationFailed):
+        edit_inventory_item(temp_db, item, spare_type="", model="Pixel 7", quantity=2)
+    with pytest.raises(ValidationFailed):
+        edit_inventory_item(temp_db, item, spare_type="screen", model="", quantity=2)
+    with pytest.raises(ValidationFailed):
+        edit_inventory_item(temp_db, item, spare_type="screen", model="Pixel 7", quantity=-1)
+    with pytest.raises(ValidationFailed):
+        edit_inventory_item(temp_db, item, spare_type="screen", model="Pixel 7", quantity=2, cost_price=-1)
+    with pytest.raises(ValidationFailed):
+        edit_inventory_item(temp_db, item, spare_type="screen", model="Pixel 7", quantity=2, selling_price=-1)
+
+    # Adjust / delete non-existent item ID
+    with pytest.raises(ValidationFailed, match="Inventory item not found"):
+        adjust_inventory_stock(temp_db, 999999, delta=1)
+
+    with pytest.raises(ValidationFailed, match="Inventory item not found"):
+        delete_inventory_item(temp_db, 999999)
+
+
+def test_items_service_validations(temp_db):
+    t = create_ticket(
+        db=temp_db,
+        customer_phone="9876543210",
+        customer_name="Rohan",
+        device_brand="Apple",
+        device_model="iPhone 13",
+        reported_issue="Broken screen",
+    )
+
+    # Description validation
+    with pytest.raises(ValidationFailed, match="Item description"):
+        add_item(temp_db, t, item_type="labor", description="", price_charged=500)
+    with pytest.raises(ValidationFailed, match="Item description"):
+        add_item(temp_db, t, item_type="labor", description="x" * 121, price_charged=500)
+
+    # Price validation
+    with pytest.raises(ValidationFailed, match="Price charged"):
+        add_item(temp_db, t, item_type="labor", description="Repair", price_charged=-10)
+    with pytest.raises(ValidationFailed, match="Price charged"):
+        add_item(temp_db, t, item_type="labor", description="Repair", price_charged=10_00_001)
+
+    # Item type validation
+    with pytest.raises(ValidationFailed, match="labor or part"):
+        add_item(temp_db, t, item_type="other", description="Repair", price_charged=500)
+
+    # Part cost price validation
+    with pytest.raises(ValidationFailed, match="Cost price"):
+        add_item(temp_db, t, item_type="part", description="Screen", price_charged=500, cost_price=-10)
+
+    # Non-existent inventory item
+    with pytest.raises(ValidationFailed, match="Selected inventory item not found"):
+        add_item(temp_db, t, item_type="part", description="Screen", price_charged=500, inventory_item_id=999999)
+
+    # Edit item validations
+    item = add_item(temp_db, t, item_type="part", description="Valid part", price_charged=500, cost_price=200)
+    with pytest.raises(ValidationFailed, match="Description"):
+        edit_item(temp_db, item, description="", price_charged=500)
+    with pytest.raises(ValidationFailed, match="Price charged"):
+        edit_item(temp_db, item, description="Valid part", price_charged=-1)
+    with pytest.raises(ValidationFailed, match="Cost price"):
+        edit_item(temp_db, item, description="Valid part", price_charged=500, cost_price=-1)
+
+
+def test_backup_and_catchup_helpers(tmp_path):
+    from pathlib import Path
+
+    from app.services.backup import (
+        create_backup,
+        get_sqlite_source_path,
+        run_startup_catchup_backup,
+    )
+
+    src = get_sqlite_source_path()
+    assert isinstance(src, Path)
+
+    # Non-existent source logs warning and returns target path
+    non_existent = tmp_path / "does_not_exist.db"
+    res = create_backup(src_path=non_existent, backup_dir=tmp_path / "backups")
+    assert res.parent == tmp_path / "backups"
+
+    # Catchup backup returns bool
+    did_catchup = run_startup_catchup_backup()
+    assert isinstance(did_catchup, bool)
+

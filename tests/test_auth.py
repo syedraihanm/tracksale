@@ -99,3 +99,57 @@ def test_passcode_encryption():
     assert cipher != plain
     assert decrypt_passcode(cipher) == plain
     assert decrypt_passcode(None) is None
+
+
+def test_route_aliases(client, temp_db):
+    # Test health endpoints
+    res_z = client.get("/healthz")
+    assert res_z.status_code == 200
+    assert res_z.json() == {"status": "ok", "db": "ok"}
+
+    res_h = client.get("/health")
+    assert res_h.status_code == 200
+    assert res_h.json() == {"status": "ok", "db": "ok"}
+
+    # Set up user and log in
+    setting = temp_db.query(SettingsModel).filter_by(id=1).first()
+    setting.admin_password_hash = hash_secret("secret123")
+    setting.setup_completed = True
+    temp_db.commit()
+
+    # Unauthenticated redirects to /login
+    assert client.get("/").status_code == 303
+    assert client.get("/queue").status_code == 303
+
+    # Log in
+    login_res = client.post("/login", data={"password": "secret123"})
+    assert login_res.status_code == 303
+    client.cookies.set("session", login_res.cookies["session"])
+
+    # Both / and /queue return 200 for authenticated sessions
+    res_root = client.get("/")
+    assert res_root.status_code == 200
+
+    res_queue = client.get("/queue")
+    assert res_queue.status_code == 200
+
+
+def test_independent_rate_limiters():
+    from app.security import RateLimiter
+
+    login_rl = RateLimiter(max_attempts=3, window_seconds=60, lockout_seconds=60)
+    pin_rl = RateLimiter(max_attempts=3, window_seconds=60, lockout_seconds=60)
+
+    key = "127.0.0.1"
+
+    # Fail login 3 times -> login locks out
+    login_rl.record_failure(key)
+    login_rl.record_failure(key)
+    locked, remaining = login_rl.record_failure(key)
+    assert locked is True
+    assert remaining > 0
+
+    # PIN rate limiter for same IP must NOT be locked
+    is_pin_locked, _ = pin_rl.is_locked(key)
+    assert is_pin_locked is False
+

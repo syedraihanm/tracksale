@@ -279,7 +279,7 @@ uv run python -c "from app.services.backup import create_backup; print(create_ba
 - Full test suite passes (46 of 46 tests passing with zero failures).
 
 ### Architectural Quirks & Known Considerations:
-1. **Inventory Migration in Alembic:** The table `inventory_items` is defined as an ORM model in `app/models/inventory.py` and referenced in `ticket_item.py`. Tests use `Base.metadata.create_all()`, which provisions it automatically. However, `inventory_items` was introduced in a later phase and is not present in the initial Alembic migration script (`99c02672819f_initial_schema.py`). Production setups starting purely from Alembic migrations should verify a follow-up migration exists for `inventory_items`.
+1. **Inventory Migration in Alembic:** The table `inventory_items` and `ticket_items.inventory_item_id` (along with the anti-delete trigger `trg_no_delete_inventory_items`) are fully provisioned and tracked by Alembic migration `a1b2c3d4e5f6_add_inventory_schema.py`. Zero-drift validation is verified in `test_alembic_migrations_and_zero_drift`.
 2. **WeasyPrint Fallback:** Thermal receipts and invoices use browser print styles (`@media print`) and print CSS rather than server-side headless browser generation (e.g. WeasyPrint) due to Windows binary compilation complexities (ADR `A-01`).
 3. **Single Shop Design:** The system is single-tenant and single-shop. Admin authentication uses a single admin password and an owner PIN stored in the `settings` table rather than a multi-user RBAC table (ADR `A-28`).
 4. **Soft Delete Policy:** No rows are physically deleted from operational tables. Soft-deletion flags (`is_deleted=True`) with deletion reasons are used throughout.

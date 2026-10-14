@@ -44,6 +44,7 @@ STATUS_DISPLAY_NAMES = {
 
 
 @router.get("/", response_class=HTMLResponse)
+@router.get("/queue", response_class=HTMLResponse, include_in_schema=False)
 def queue_view(
     request: Request,
     status: list[str] = Query(default=[]),
