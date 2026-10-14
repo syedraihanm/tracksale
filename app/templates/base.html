@@ -1,137 +1,423 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-50">
+<html lang="en" class="h-full bg-[#F8FAFC] antialiased">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Repair Shop{% endblock %} - {{ shop_name|default("Mobile Repair Shop") }}</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                        }
-                    }
-                }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{{ shop_name | default('TrackSale POS') }}{% endblock %}</title>
+
+  <!-- Google Fonts: Inter (UI) & JetBrains Mono (Ticket IDs, IMEI, Currency) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS Play CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
             }
+          }
         }
-    </script>
-    <!-- HTMX 2.0.3 CDN -->
-    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/app.css">
-    {% block head_extra %}{% endblock %}
+      }
+    };
+  </script>
+
+  <!-- HTMX 2.0.3 & Chart.js 4.x -->
+  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <!-- Cache-busted Custom Stylesheet -->
+  <link rel="stylesheet" href="/static/app.css?v=3.0" />
+  {% block head %}{% endblock %}
+  {% block head_extra %}{% endblock %}
 </head>
-<body class="h-full flex flex-col text-slate-900 font-sans antialiased"
-      {% if session and session.csrf_token %}hx-headers='{"X-CSRF-Token": "{{ session.csrf_token }}"}'{% endif %}>
 
-    {% if session and session.user_id %}
-    <!-- Global Header -->
-    <header class="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm no-print">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16 gap-4">
-                <!-- Shop Name / Brand -->
-                <div class="flex items-center gap-3 shrink-0">
-                    <a href="/" class="flex items-center gap-2 font-bold text-lg text-slate-800 hover:text-brand-600 transition">
-                        <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                        </svg>
-                        <span>{{ shop_name|default("Mobile Repair Shop") }}</span>
-                    </a>
-                </div>
+{% set current_path = request.url.path if (request is defined and request) else '/' %}
+{% set is_auth_screen = current_path in ['/login', '/setup'] %}
+{% set active_csrf = csrf_token if csrf_token is defined else (request.state.csrf_token if (request is defined and request and request.state and request.state.csrf_token is defined) else (session.csrf_token if (session is defined and session and session.csrf_token is defined) else '')) %}
 
-                <!-- Global Live Search (Always Visible Center) -->
-                <div id="search-box-container" class="relative flex-1 max-w-md mx-auto">
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
-                        </div>
-                        <input type="text"
-                               id="global-search"
-                               name="q"
-                               placeholder="Search ticket, customer, phone, IMEI..."
-                               autocomplete="off"
-                               class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition"
-                               hx-get="/search"
-                               hx-trigger="input changed delay:250ms, search"
-                               hx-target="#search-results"
-                               onfocus="document.getElementById('search-results').classList.remove('hidden')"
-                               onkeydown="if(event.key === 'Enter') { const top = document.querySelector('.search-result-item'); if(top) { top.click(); } }">
-                    </div>
-                    <!-- Live Search Results Dropdown -->
-                    <div id="search-results"
-                         class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-96 overflow-y-auto z-50">
-                    </div>
-                </div>
+{% set nav_base = "group flex flex-row items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150" %}
+{% set nav_active = "bg-indigo-600 text-white shadow-md shadow-indigo-950/40" %}
+{% set nav_inactive = "text-slate-400 hover:text-white hover:bg-slate-800/70" %}
 
-                <!-- Navigation Links (Desktop) -->
-                <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
-                    <a href="/" class="px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition">Queue</a>
-                    <a href="/tickets/new" class="px-3 py-2 rounded-md bg-brand-600 text-white hover:bg-brand-700 transition flex items-center gap-1">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        New Ticket
-                    </a>
-                    <a href="/ready" class="px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition">Ready</a>
-                    <a href="/inventory" class="px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition">Inventory</a>
-                    <a href="/cash" class="px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition">Cash Close</a>
-                    <a href="/dashboard" class="px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition">Dashboard</a>
-                    <a href="/settings" class="px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition">Settings</a>
-                    <form action="/logout" method="POST" class="inline">
-                        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
-                        <button type="submit" class="px-3 py-2 rounded-md hover:bg-red-50 text-red-600 transition">Logout</button>
-                    </form>
-                </nav>
-
-                <!-- Mobile Hamburger Button -->
-                <div class="flex md:hidden">
-                    <button type="button"
-                            onclick="document.getElementById('mobile-menu').classList.toggle('hidden')"
-                            class="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Mobile Navigation Menu -->
-            <div id="mobile-menu" class="hidden md:hidden pb-3 border-t border-slate-200 mt-2 space-y-1">
-                <a href="/" class="block px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700">Queue</a>
-                <a href="/tickets/new" class="block px-3 py-2 rounded-md bg-brand-600 text-white font-medium">New Ticket</a>
-                <a href="/ready" class="block px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700">Ready for Pickup</a>
-                <a href="/inventory" class="block px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700">Inventory</a>
-                <a href="/cash" class="block px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700">Cash Close</a>
-                <a href="/dashboard" class="block px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700">Dashboard</a>
-                <a href="/settings" class="block px-3 py-2 rounded-md hover:bg-slate-100 text-slate-700">Settings</a>
-                <form action="/logout" method="POST" class="block">
-                    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
-                    <button type="submit" class="w-full text-left px-3 py-2 rounded-md text-red-600 hover:bg-red-50">Logout</button>
-                </form>
-            </div>
+<body
+  class="h-full text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 {% if is_auth_screen %}auth-screen{% endif %}"
+  {% if active_csrf %}hx-headers='{"X-CSRF-Token": "{{ active_csrf }}"}'{% endif %}
+>
+  {% if is_auth_screen %}
+    <!-- Centered Auth / First-Run Setup Layout -->
+    <div class="min-h-full flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950">
+      <div class="sm:mx-auto sm:w-full sm:max-w-md text-center mb-6">
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 mb-3">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+          </svg>
         </div>
-    </header>
-    {% endif %}
+        <h1 class="text-2xl font-bold tracking-tight text-white">
+          {{ shop_name | default('TrackSale Repair POS') }}
+        </h1>
+      </div>
 
-    <!-- Main Content Container -->
-    <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {% block content %}{% endblock %}
-    </main>
-
-    <!-- Global Toast Container -->
-    <div id="toast-container" aria-live="polite" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-md pointer-events-auto">
+      <main class="sm:mx-auto sm:w-full sm:max-w-md px-4">
+        {% block auth_content %}{% endblock %}
+        {% if self.content is defined %}{{ self.content() }}{% endif %}
+      </main>
     </div>
 
-    <!-- Custom Scripts -->
-    <script src="/static/app.js"></script>
-    {% block scripts_extra %}{% endblock %}
+  {% else %}
+    <!-- Main Authenticated App Shell -->
+    <div id="app-shell" class="min-h-screen flex bg-[#F8FAFC]">
+
+      <!-- Mobile Sidebar Backdrop -->
+      <div
+        id="sidebar-backdrop"
+        onclick="window.TrackSaleUI.closeMobileSidebar()"
+        class="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-xs hidden lg:hidden transition-opacity print:hidden"
+        aria-hidden="true"
+      ></div>
+
+      <!-- Left Sidebar Navigation -->
+      <aside
+        id="app-sidebar"
+        aria-label="Sidebar Navigation"
+        class="fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-[#0B0F19] text-slate-300 border-r border-slate-800/80 transition-all duration-200 ease-in-out -translate-x-full lg:translate-x-0 print:hidden select-none"
+      >
+        <!-- Shop Brand Header -->
+        <div class="flex items-center justify-between h-16 px-4 border-b border-white/[0.07] shrink-0">
+          <a href="/" class="flex items-center gap-3 min-w-0 group">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-md shadow-indigo-600/25 shrink-0 ring-1 ring-white/15">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+              </svg>
+            </div>
+            <div class="sidebar-label truncate">
+              <span class="block text-sm font-semibold text-white tracking-tight truncate">
+                {{ shop_name | default('Apex Mobile Care') }}
+              </span>
+              <span class="block text-[11px] text-slate-400 font-medium">Repair & Service Desk</span>
+            </div>
+          </a>
+
+          <!-- Collapse Button (Desktop) -->
+          <button
+            type="button"
+            onclick="window.TrackSaleUI.toggleDesktopSidebar()"
+            title="Collapse / Expand Sidebar (Ctrl+B)"
+            class="hidden lg:inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition shrink-0"
+          >
+            <svg id="sidebar-collapse-icon" class="w-4 h-4 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+          </button>
+
+          <!-- Close Button (Mobile) -->
+          <button
+            type="button"
+            onclick="window.TrackSaleUI.closeMobileSidebar()"
+            class="lg:hidden inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 shrink-0"
+          >
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Primary Action CTA: New Repair Ticket -->
+        <div class="p-3.5 shrink-0">
+          <a
+            href="/tickets/new"
+            class="flex flex-row items-center justify-center gap-2.5 w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-semibold text-sm shadow-lg shadow-indigo-600/25 ring-1 ring-inset ring-white/15 transition-all group"
+            title="New Repair Ticket (Alt+N)"
+          >
+            <svg class="w-4 h-4 shrink-0 transition-transform group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span class="sidebar-label truncate">New Repair Ticket</span>
+          </a>
+        </div>
+
+        <!-- Scrollable Navigation Links -->
+        <nav class="flex-1 px-3 py-2 space-y-6 overflow-y-auto sidebar-scroll">
+          <!-- Section 1: Daily Operations -->
+          <div>
+            <p class="sidebar-section-header px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              Daily Operations
+            </p>
+            <ul class="space-y-1">
+              <li>
+                {% set is_queue = current_path == '/' or current_path.startswith('/queue') or (current_path.startswith('/tickets') and current_path != '/tickets/new') %}
+                <a
+                  href="/"
+                  class="nav-link-item {{ nav_base }} {{ nav_active if is_queue else nav_inactive }}"
+                  title="Repair Queue"
+                >
+                  <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_queue else 'text-slate-400 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+                  </svg>
+                  <span class="sidebar-label truncate">Repair Queue</span>
+                </a>
+              </li>
+
+              <li>
+                {% set is_ready = current_path.startswith('/ready') %}
+                <a
+                  href="/ready"
+                  class="nav-link-item {{ nav_base }} {{ nav_active if is_ready else nav_inactive }}"
+                  title="Ready for Pickup"
+                >
+                  <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_ready else 'text-emerald-400 group-hover:text-emerald-300' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span class="sidebar-label truncate">Ready for Pickup</span>
+                </a>
+              </li>
+
+              <li>
+                {% set is_inventory = current_path.startswith('/inventory') %}
+                <a
+                  href="/inventory"
+                  class="nav-link-item {{ nav_base }} {{ nav_active if is_inventory else nav_inactive }}"
+                  title="Parts Inventory"
+                >
+                  <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_inventory else 'text-slate-400 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                  </svg>
+                  <span class="sidebar-label truncate">Parts Inventory</span>
+                </a>
+              </li>
+
+              <li>
+                {% set is_cash = current_path.startswith('/cash') %}
+                <a
+                  href="/cash"
+                  class="nav-link-item {{ nav_base }} {{ nav_active if is_cash else nav_inactive }}"
+                  title="Daily Cash Close"
+                >
+                  <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_cash else 'text-slate-400 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+                  </svg>
+                  <span class="sidebar-label truncate">Daily Cash Close</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Section 2: Management & Admin -->
+          <div>
+            <p class="sidebar-section-header px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              Management & Admin
+            </p>
+            <ul class="space-y-1">
+              <li>
+                {% set is_dashboard = current_path.startswith('/dashboard') %}
+                <a
+                  href="/dashboard"
+                  class="nav-link-item {{ nav_base }} {{ nav_active if is_dashboard else nav_inactive }}"
+                  title="Analytics Dashboard (PIN Protected)"
+                >
+                  <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_dashboard else 'text-slate-400 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                  </svg>
+                  <span class="sidebar-label flex-1 truncate">Analytics</span>
+                  <span class="sidebar-label inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/25">
+                    PIN
+                  </span>
+                </a>
+              </li>
+
+              <li>
+                {% set is_import = current_path.startswith('/import') %}
+                <a
+                  href="/import"
+                  class="nav-link-item {{ nav_base }} {{ nav_active if is_import else nav_inactive }}"
+                  title="Data Import (PIN Protected)"
+                >
+                  <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_import else 'text-slate-400 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  <span class="sidebar-label flex-1 truncate">Data Import</span>
+                  <span class="sidebar-label inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/25">
+                    PIN
+                  </span>
+                </a>
+              </li>
+
+              <li>
+                {% set is_audit = current_path.startswith('/audit') %}
+                <a
+                  href="/audit"
+                  class="nav-link-item {{ nav_base }} {{ nav_active if is_audit else nav_inactive }}"
+                  title="Audit Trail"
+                >
+                  <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_audit else 'text-slate-400 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                  </svg>
+                  <span class="sidebar-label truncate">Audit Trail</span>
+                </a>
+              </li>
+
+              <li>
+                {% set is_settings = current_path.startswith('/settings') %}
+                <a
+                  href="/settings"
+                  class="nav-link-item {{ nav_base }} {{ nav_active if is_settings else nav_inactive }}"
+                  title="Settings & Backups"
+                >
+                  <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_settings else 'text-slate-400 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span class="sidebar-label truncate">Settings & Backups</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        <!-- Sidebar Footer: PIN Session & Logout -->
+        <div class="p-3 border-t border-white/[0.07] space-y-1 shrink-0 bg-slate-950/40">
+          <a
+            href="/pin?next={{ current_path | urlencode }}"
+            class="nav-link-item flex flex-row items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
+            title="Unlock Owner PIN"
+          >
+            <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            <span class="sidebar-label truncate">Owner PIN Session</span>
+          </a>
+
+          <form method="post" action="/logout" class="w-full">
+            <input type="hidden" name="csrf_token" value="{{ active_csrf }}" />
+            <button
+              type="submit"
+              class="nav-link-item flex flex-row items-center gap-3 w-full px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition"
+              title="Sign Out"
+            >
+              <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+              </svg>
+              <span class="sidebar-label truncate">Sign Out</span>
+            </button>
+          </form>
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <div id="main-content-wrapper" class="flex-1 flex flex-col min-w-0 lg:pl-64 transition-all duration-200 ease-in-out">
+
+        <!-- Sticky Top Command Bar -->
+        <header class="sticky top-0 z-30 h-16 bg-white/85 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 print:hidden">
+          <!-- Left: Mobile Hamburger + Breadcrumb Context -->
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              onclick="window.TrackSaleUI.openMobileSidebar()"
+              class="lg:hidden inline-flex items-center justify-center p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              aria-label="Open menu"
+            >
+              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Center: Command Search Bar -->
+          <div class="relative flex-1 max-w-xl" id="global-search-container">
+            <div class="relative flex items-center">
+              <svg class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              </svg>
+              <input
+                id="global-search-input"
+                type="search"
+                name="q"
+                autocomplete="off"
+                placeholder="Search ticket # (e.g. 1042), phone, customer, IMEI, or model..."
+                hx-get="/search"
+                hx-trigger="input changed delay:250ms, focus[this.value.trim().length >= 2]"
+                hx-target="#global-search-results"
+                hx-indicator="#search-spinner"
+                class="w-full pl-10 pr-20 py-2 bg-slate-100/75 hover:bg-slate-100 focus:bg-white text-sm text-slate-900 placeholder-slate-400 rounded-xl border border-slate-200/90 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all"
+              />
+              <div id="search-spinner" class="htmx-indicator absolute right-14">
+                <svg class="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              </div>
+              <kbd class="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 text-[11px] font-mono font-medium text-slate-400 bg-white border border-slate-200 rounded-md shadow-2xs absolute right-2.5 pointer-events-none">
+                Ctrl K
+              </kbd>
+            </div>
+
+            <!-- Live Search Results Dropdown -->
+            <div
+              id="global-search-results"
+              class="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden z-50 empty:hidden max-h-[70vh] overflow-y-auto"
+            ></div>
+          </div>
+
+          <!-- Right: Quick Status Pills -->
+          <div class="flex items-center gap-2.5">
+            <a
+              href="/ready"
+              class="hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 ring-1 ring-inset ring-emerald-600/20 transition"
+              title="Devices Ready for Pickup"
+            >
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Ready Pickup
+            </a>
+            <a
+              href="/cash"
+              class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 ring-1 ring-inset ring-slate-200 shadow-2xs transition"
+              title="Daily Cash Drawer"
+            >
+              Cash Drawer
+            </a>
+          </div>
+        </header>
+
+        <!-- Flash / Banner Notifications -->
+        {% if flash_message is defined and flash_message %}
+          <div class="mx-4 sm:mx-6 lg:mx-8 mt-4 rounded-xl bg-indigo-50 border border-indigo-200 p-4 text-sm text-indigo-900 flex items-center justify-between print:hidden">
+            <span>{{ flash_message }}</span>
+            <button type="button" onclick="this.parentElement.remove()" class="text-indigo-600 hover:text-indigo-800 font-medium">Dismiss</button>
+          </div>
+        {% endif %}
+
+        <!-- Page Content -->
+        <main id="page-main" class="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1560px] w-full mx-auto">
+          {% block content %}{% endblock %}
+        </main>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Accessible Toast Stack -->
+  <div
+    id="toast-container"
+    aria-live="polite"
+    aria-atomic="true"
+    class="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none print:hidden"
+  ></div>
+
+  <!-- Cache-busted Global Script -->
+  <script src="/static/app.js?v=3.0"></script>
+  {% block scripts %}{% endblock %}
+  {% block scripts_extra %}{% endblock %}
 </body>
 </html>
