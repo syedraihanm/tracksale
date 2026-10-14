@@ -277,11 +277,16 @@
     <form method="POST" action="/cash/{{ target_date.isoformat() }}/reopen" class="space-y-4">
         <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
         <h3 class="text-lg font-bold text-slate-900">Reopen Closed Day</h3>
-        <p class="text-xs text-slate-500">Enter your Owner PIN to unlock payments and modifications for this date.</p>
+        <p class="text-xs text-slate-500">Unlocks payments and modifications for {{ target_date.strftime('%d %b %Y') }}. Requires a mandatory reason and Owner PIN.</p>
+
+        <div>
+            <label class="block text-xs font-medium text-slate-700">Reason for Reopening *</label>
+            <input type="text" name="reason" required minlength="3" placeholder="e.g. Forgot evening payment, customer came late" autofocus class="mt-1 w-full px-3 py-2 border border-slate-300 rounded text-xs">
+        </div>
 
         <div>
             <label class="block text-xs font-medium text-slate-700">Owner PIN *</label>
-            <input type="password" name="owner_pin" required placeholder="Owner PIN" autofocus class="mt-1 w-full px-3 py-2 border border-slate-300 rounded text-xs font-mono">
+            <input type="password" name="owner_pin" required placeholder="Owner PIN" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded text-xs font-mono">
         </div>
 
         <div class="flex justify-end gap-2 pt-2">

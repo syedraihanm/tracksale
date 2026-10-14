@@ -202,6 +202,9 @@ def ticket_detail(request: Request, id: int, db: Session = Depends(get_db)):
         .all()
     )
 
+    from app.services.inventory import get_available_spares
+    available_inventory = get_available_spares(db)
+
     return templates.TemplateResponse(
         request=request,
         name="tickets/detail.html",
@@ -221,6 +224,7 @@ def ticket_detail(request: Request, id: int, db: Session = Depends(get_db)):
             "wa_intake_url": wa_intake,
             "wa_ready_url": wa_ready,
             "categories": ISSUE_CATEGORIES,
+            "available_inventory": available_inventory,
         },
     )
 

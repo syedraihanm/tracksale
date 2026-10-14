@@ -288,7 +288,14 @@
                                 <td class="px-3 py-2 font-semibold uppercase text-[10px] {% if it.type == 'labor' %}text-blue-600{% else %}text-amber-600{% endif %}">
                                     {{ it.type }}
                                 </td>
-                                <td class="px-3 py-2 font-medium text-slate-800">{{ it.description }}</td>
+                                <td class="px-3 py-2 font-medium text-slate-800">
+                                    {{ it.description }}
+                                    {% if it.inventory_item_id %}
+                                    <span class="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        Inventory
+                                    </span>
+                                    {% endif %}
+                                </td>
                                 <td class="px-3 py-2 text-right font-mono font-bold">{{ it.price_charged|inr }}</td>
                                 <td class="px-3 py-2 text-right font-mono text-slate-500">
                                     {% if it.type == 'part' %}{{ it.cost_price|inr }}{% else %}-{% endif %}
@@ -320,36 +327,158 @@
                     <span class="text-xs font-bold text-slate-700 block mb-2">+ Add Line Item</span>
                     <form method="POST" action="/tickets/{{ ticket.id }}/items" class="space-y-3">
                         <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <input type="hidden" name="inventory_item_id" id="item_inventory_item_id" value="">
+
+                        <!-- Searchable Inventory Spare Selector for Parts -->
+                        <div id="inventory-part-selector" class="bg-white p-3.5 rounded-lg border border-slate-200 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                    Search & Select from Available Inventory Spares:
+                                </label>
+                                <span class="text-[10px] text-slate-400">or enter details manually below</span>
+                            </div>
+
+                            <!-- Search Input & Combobox -->
+                            <div class="relative" id="inv_combobox_container">
+                                <div class="relative flex items-center">
+                                    <span class="absolute left-2.5 text-slate-400 pointer-events-none">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                    </span>
+                                    <input type="text"
+                                           id="inv_search_input"
+                                           oninput="onInventorySearchInput(this.value)"
+                                           onfocus="openInventoryDropdown()"
+                                           placeholder="🔍 Search available spares by model, category (e.g. display, battery, iPhone)..."
+                                           autocomplete="off"
+                                           class="w-full pl-8 pr-8 py-2 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition">
+                                    <button type="button"
+                                            id="inv_search_clear_btn"
+                                            onclick="clearInventorySelection(false)"
+                                            class="hidden absolute right-2.5 text-slate-400 hover:text-slate-600 text-xs p-1"
+                                            title="Clear search">✕</button>
+                                </div>
+
+                                <!-- Selected Item Notification Card -->
+                                <div id="inv_selected_card" class="hidden mt-2 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <span id="inv_selected_type" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white">Spare</span>
+                                        <div>
+                                            <span id="inv_selected_model" class="font-bold text-slate-900"></span>
+                                            <span id="inv_selected_details" class="text-slate-500 text-[11px] ml-1.5"></span>
+                                        </div>
+                                    </div>
+                                    <button type="button" onclick="clearInventorySelection(true)" class="text-emerald-700 hover:text-emerald-900 font-semibold text-[11px] flex items-center gap-1">
+                                        ✕ Clear / Enter manually
+                                    </button>
+                                </div>
+
+                                <!-- Dropdown Results Menu -->
+                                <div id="inv_dropdown_menu" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-30 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                                    <!-- Manual / None Option -->
+                                    <div class="p-2.5 hover:bg-slate-50 cursor-pointer text-xs text-slate-500 italic flex items-center gap-2"
+                                         onclick="clearInventorySelection(true)">
+                                        <span>-- No inventory item selected (Enter normally / manually below) --</span>
+                                    </div>
+
+                                    <!-- Available spares list -->
+                                    <div id="inv_options_container">
+                                        {% if available_inventory %}
+                                        {% for inv in available_inventory %}
+                                        <div class="inv-option-item p-2.5 hover:bg-brand-50 cursor-pointer transition flex items-center justify-between text-xs"
+                                             data-id="{{ inv.id }}"
+                                             data-type="{{ inv.spare_type }}"
+                                             data-model="{{ inv.model }}"
+                                             data-cost="{{ inv.cost_price }}"
+                                             data-selling="{{ inv.selling_price }}"
+                                             data-supplier="{{ inv.supplier_name or '' }}"
+                                             data-notes="{{ inv.notes or '' }}"
+                                             data-qty="{{ inv.quantity }}"
+                                             data-search="{{ inv.spare_type|lower }} {{ inv.model|lower }} {{ (inv.supplier_name or '')|lower }} {{ (inv.notes or '')|lower }}"
+                                             onclick="selectInventoryItem(this)">
+                                            <div class="flex items-center gap-2 min-w-0 pr-2">
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize whitespace-nowrap
+                                                    {% if inv.spare_type == 'display' %}bg-blue-50 text-blue-700 border border-blue-200
+                                                    {% elif inv.spare_type == 'battery' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+                                                    {% elif inv.spare_type == 'backdoor' %}bg-purple-50 text-purple-700 border border-purple-200
+                                                    {% elif inv.spare_type == 'motherboard' %}bg-indigo-50 text-indigo-700 border border-indigo-200
+                                                    {% elif inv.spare_type == 'camera' %}bg-pink-50 text-pink-700 border border-pink-200
+                                                    {% elif inv.spare_type == 'charger board' %}bg-amber-50 text-amber-700 border border-amber-200
+                                                    {% elif inv.spare_type == 'glass' %}bg-cyan-50 text-cyan-700 border border-cyan-200
+                                                    {% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                                                    {{ inv.spare_type }}
+                                                </span>
+                                                <div class="min-w-0">
+                                                    <span class="font-semibold text-slate-800 block truncate">{{ inv.model }}</span>
+                                                    {% if inv.supplier_name %}
+                                                    <span class="text-[10px] text-slate-400 block truncate">Supplier: {{ inv.supplier_name }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-3 flex-shrink-0 text-right">
+                                                <div>
+                                                    <span class="text-[10px] text-slate-400 block">Stock</span>
+                                                    <span class="font-bold text-slate-700">{{ inv.quantity }}</span>
+                                                </div>
+                                                <div>
+                                                    <span class="text-[10px] text-slate-400 block">Cost</span>
+                                                    <span class="font-mono text-slate-600">{{ inv.cost_price|inr }}</span>
+                                                </div>
+                                                {% if inv.selling_price %}
+                                                <div>
+                                                    <span class="text-[10px] text-slate-400 block">Selling</span>
+                                                    <span class="font-mono font-bold text-emerald-700">{{ inv.selling_price|inr }}</span>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                        {% else %}
+                                        <div class="p-4 text-center text-xs text-slate-400 italic">
+                                            No spares currently in stock. You can enter parts manually below.
+                                        </div>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- No Results Message -->
+                                    <div id="inv_no_results" class="hidden p-4 text-center text-xs text-slate-500">
+                                        <p>No inventory spares matching "<span id="inv_query_text" class="font-semibold text-slate-700"></span>"</p>
+                                        <p class="text-[11px] text-slate-400 mt-1">You can enter the part normally in the fields below.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
                             <div>
                                 <label class="block text-[11px] text-slate-600">Type</label>
                                 <select name="item_type"
                                         id="item_type_select"
-                                        onchange="document.getElementById('part-fields').classList.toggle('hidden', this.value !== 'part')"
+                                        onchange="document.getElementById('part-fields').classList.toggle('hidden', this.value !== 'part'); document.getElementById('inventory-part-selector').classList.toggle('hidden', this.value !== 'part')"
                                         class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded bg-white">
-                                    <option value="labor" selected>Labor</option>
-                                    <option value="part">Part</option>
+                                    <option value="part" selected>Part</option>
+                                    <option value="labor">Labor</option>
                                 </select>
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-[11px] text-slate-600">Description *</label>
-                                <input type="text" name="description" required placeholder="e.g. Display replacement, Charging flex" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded">
+                                <input type="text" name="description" id="item_description_input" required placeholder="e.g. Display replacement, Charging flex" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded">
                             </div>
                             <div>
                                 <label class="block text-[11px] text-slate-600">Price Charged ₹ *</label>
-                                <input type="text" name="price_charged" required placeholder="e.g. 1500" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded font-mono">
+                                <input type="text" name="price_charged" id="item_price_charged_input" required placeholder="e.g. 1500" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded font-mono">
                             </div>
                         </div>
 
                         <!-- Extra fields for Parts -->
-                        <div id="part-fields" class="hidden grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-1">
+                        <div id="part-fields" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-1">
                             <div>
                                 <label class="block text-[11px] text-slate-600">Cost Price ₹ (Parts only)</label>
-                                <input type="text" name="cost_price" value="0" placeholder="e.g. 1100" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded font-mono">
+                                <input type="text" name="cost_price" id="item_cost_price_input" value="0" placeholder="e.g. 1100" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded font-mono">
                             </div>
                             <div>
                                 <label class="block text-[11px] text-slate-600">Supplier Name (Optional)</label>
-                                <input type="text" name="supplier_name" placeholder="e.g. Metro Spares" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded">
+                                <input type="text" name="supplier_name" id="item_supplier_name_input" placeholder="e.g. Metro Spares" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded">
                             </div>
                         </div>
 
@@ -464,11 +593,7 @@
                             </div>
                         </div>
 
-                        <div class="flex items-center justify-between pt-1">
-                            <label class="flex items-center gap-1.5 text-[11px] text-slate-600 select-none cursor-pointer">
-                                <input type="checkbox" name="confirm_overpay" value="1" class="rounded text-brand-600">
-                                <span>Confirm overpayment if exceeding balance</span>
-                            </label>
+                        <div class="flex items-center justify-end pt-1">
                             <button type="submit" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition shadow-sm">
                                 Record Payment
                             </button>
@@ -704,6 +829,198 @@ function openDeletePaymentModal(paymentId, amountStr) {
     form.action = `/payments/${paymentId}/delete`;
     document.getElementById('delete-payment-info').innerText = `Soft delete payment of ${amountStr}. Blocked if day is closed.`;
     openModal('delete-payment-dialog');
+}
+
+function openInventoryDropdown() {
+    const menu = document.getElementById('inv_dropdown_menu');
+    if (menu) menu.classList.remove('hidden');
+}
+
+function closeInventoryDropdown() {
+    const menu = document.getElementById('inv_dropdown_menu');
+    if (menu) menu.classList.add('hidden');
+}
+
+function onInventorySearchInput(query) {
+    openInventoryDropdown();
+    const clearBtn = document.getElementById('inv_search_clear_btn');
+    if (clearBtn) clearBtn.classList.toggle('hidden', !query);
+
+    const term = query.trim().toLowerCase();
+    const items = document.querySelectorAll('.inv-option-item');
+    let visibleCount = 0;
+
+    items.forEach(el => {
+        const searchData = (el.getAttribute('data-search') || '').toLowerCase();
+        if (!term || searchData.includes(term)) {
+            el.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            el.classList.add('hidden');
+        }
+    });
+
+    const noResults = document.getElementById('inv_no_results');
+    const queryText = document.getElementById('inv_query_text');
+    if (noResults && queryText) {
+        if (visibleCount === 0 && items.length > 0) {
+            queryText.innerText = query;
+            noResults.classList.remove('hidden');
+        } else {
+            noResults.classList.add('hidden');
+        }
+    }
+}
+
+function selectInventoryItem(el) {
+    const invId = el.getAttribute('data-id');
+    const spareType = el.getAttribute('data-type') || '';
+    const spareModel = el.getAttribute('data-model') || '';
+    const cost = el.getAttribute('data-cost');
+    const selling = el.getAttribute('data-selling');
+    const supplier = el.getAttribute('data-supplier');
+
+    const invIdInput = document.getElementById('item_inventory_item_id');
+    const descInput = document.getElementById('item_description_input');
+    const costInput = document.getElementById('item_cost_price_input');
+    const priceChargedInput = document.getElementById('item_price_charged_input');
+    const supplierInput = document.getElementById('item_supplier_name_input');
+    const typeSelect = document.getElementById('item_type_select');
+
+    if (invIdInput) invIdInput.value = invId;
+
+    if (typeSelect && typeSelect.value !== 'part') {
+        typeSelect.value = 'part';
+        const partFields = document.getElementById('part-fields');
+        if (partFields) partFields.classList.remove('hidden');
+        const invSelector = document.getElementById('inventory-part-selector');
+        if (invSelector) invSelector.classList.remove('hidden');
+    }
+
+    const formattedType = spareType ? spareType.charAt(0).toUpperCase() + spareType.slice(1) : 'Spare';
+    if (descInput) descInput.value = `${formattedType} - ${spareModel}`;
+
+    if (costInput && cost) costInput.value = cost;
+    if (priceChargedInput) {
+        if (selling && parseFloat(selling) > 0) {
+            priceChargedInput.value = selling;
+        } else if (cost && parseFloat(cost) > 0) {
+            priceChargedInput.value = cost;
+        }
+    }
+    if (supplierInput && supplier) supplierInput.value = supplier;
+
+    // Show selected card
+    const selectedCard = document.getElementById('inv_selected_card');
+    const selectedType = document.getElementById('inv_selected_type');
+    const selectedModel = document.getElementById('inv_selected_model');
+    const selectedDetails = document.getElementById('inv_selected_details');
+    const searchInput = document.getElementById('inv_search_input');
+
+    if (selectedType) selectedType.innerText = formattedType;
+    if (selectedModel) selectedModel.innerText = spareModel;
+    if (selectedDetails) {
+        const qty = el.getAttribute('data-qty') || '';
+        selectedDetails.innerText = `(In Stock: ${qty} | Cost: ₹${cost || 0})`;
+    }
+    if (selectedCard) selectedCard.classList.remove('hidden');
+
+    if (searchInput) {
+        searchInput.value = `${formattedType} - ${spareModel}`;
+        const clearBtn = document.getElementById('inv_search_clear_btn');
+        if (clearBtn) clearBtn.classList.remove('hidden');
+    }
+
+    closeInventoryDropdown();
+}
+
+function clearInventorySelection(closeMenu) {
+    const invIdInput = document.getElementById('item_inventory_item_id');
+    if (invIdInput) invIdInput.value = '';
+
+    const selectedCard = document.getElementById('inv_selected_card');
+    if (selectedCard) selectedCard.classList.add('hidden');
+
+    const searchInput = document.getElementById('inv_search_input');
+    if (searchInput) searchInput.value = '';
+
+    const clearBtn = document.getElementById('inv_search_clear_btn');
+    if (clearBtn) clearBtn.classList.add('hidden');
+
+    // Reset visibility of all items
+    const items = document.querySelectorAll('.inv-option-item');
+    items.forEach(el => el.classList.remove('hidden'));
+    const noResults = document.getElementById('inv_no_results');
+    if (noResults) noResults.classList.add('hidden');
+
+    if (closeMenu) {
+        closeInventoryDropdown();
+    }
+}
+
+document.addEventListener('click', function(e) {
+    const container = document.getElementById('inv_combobox_container');
+    if (container && !container.contains(e.target)) {
+        closeInventoryDropdown();
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeInventoryDropdown();
+    }
+});
+
+function onInventorySelect(select) {
+    const invIdInput = document.getElementById('item_inventory_item_id');
+    const descInput = document.getElementById('item_description_input');
+    const costInput = document.getElementById('item_cost_price_input');
+    const priceChargedInput = document.getElementById('item_price_charged_input');
+    const supplierInput = document.getElementById('item_supplier_name_input');
+    const typeSelect = document.getElementById('item_type_select');
+
+    if (!select.value) {
+        if (invIdInput) invIdInput.value = '';
+        return;
+    }
+
+    const opt = select.options[select.selectedIndex];
+    if (invIdInput) invIdInput.value = select.value;
+
+    if (typeSelect && typeSelect.value !== 'part') {
+        typeSelect.value = 'part';
+        const partFields = document.getElementById('part-fields');
+        if (partFields) partFields.classList.remove('hidden');
+        const invSelector = document.getElementById('inventory-part-selector');
+        if (invSelector) invSelector.classList.remove('hidden');
+    }
+
+    const spareType = opt.getAttribute('data-type') || '';
+    const spareModel = opt.getAttribute('data-model') || '';
+    const formattedType = spareType ? spareType.charAt(0).toUpperCase() + spareType.slice(1) : 'Spare';
+
+    if (descInput) {
+        descInput.value = `${formattedType} - ${spareModel}`;
+    }
+
+    const cost = opt.getAttribute('data-cost');
+    if (costInput && cost) {
+        costInput.value = cost;
+    }
+
+    const selling = opt.getAttribute('data-selling');
+    if (priceChargedInput) {
+        if (selling && parseFloat(selling) > 0) {
+            priceChargedInput.value = selling;
+        } else if (cost && parseFloat(cost) > 0) {
+            priceChargedInput.value = cost;
+        }
+    }
+
+    const supplier = opt.getAttribute('data-supplier');
+    if (supplierInput && supplier) {
+        supplierInput.value = supplier;
+    }
 }
 </script>
 {% endblock %}

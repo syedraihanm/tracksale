@@ -111,6 +111,7 @@ from app.routers import (
     customers,
     dashboard,
     importer,
+    inventory,
     items,
     payments,
     queue,
@@ -126,6 +127,7 @@ app.include_router(auth.router)
 app.include_router(queue.router)
 app.include_router(tickets.router)
 app.include_router(items.router)
+app.include_router(inventory.router)
 app.include_router(payments.router)
 app.include_router(search.router)
 app.include_router(customers.router)

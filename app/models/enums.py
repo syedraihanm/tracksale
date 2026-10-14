@@ -42,6 +42,7 @@ class AuditEntity(str, Enum):
     CUSTOMER = "customer"
     CASH_CLOSING = "cash_closing"
     SETTINGS = "settings"
+    INVENTORY = "inventory"
 
 
 class AuditAction(str, Enum):
@@ -49,6 +50,28 @@ class AuditAction(str, Enum):
     UPDATE = "update"
     DELETE = "delete"
 
+
+class SpareCategory(str, Enum):
+    DISPLAY = "display"
+    BACKDOOR = "backdoor"
+    BATTERY = "battery"
+    CAMERA = "camera"
+    MOTHERBOARD = "motherboard"
+    CHARGER_BOARD = "charger board"
+    GLASS = "glass"
+    OTHER = "other"
+
+
+SPARE_CATEGORIES = [
+    "display",
+    "backdoor",
+    "battery",
+    "camera",
+    "motherboard",
+    "charger board",
+    "glass",
+    "other",
+]
 
 ISSUE_CATEGORIES = [
     "Screen",

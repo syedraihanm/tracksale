@@ -2,7 +2,6 @@ from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
-from app.formatting import format_inr
 from app.models.cash_closing import CashClosing
 from app.models.enums import PaymentKind, PaymentMode
 from app.models.payment import Payment
@@ -12,7 +11,6 @@ from app.security import verify_secret
 from app.services.audit import record_audit
 from app.services.errors import (
     DayClosed,
-    NeedsConfirmation,
     PinRequired,
     ValidationFailed,
 )
@@ -80,15 +78,42 @@ def add_payment(
         if amount > 10_00_000:
             raise ValidationFailed("Payment amount exceeds sanity cap of ₹10,00,000")
 
-        # Overpayment check (A-09)
+        # Overpayment handling: if payment exceeds reference total, add excess as labor automatically
         ref_total = items_total if items_total > 0 else (ticket.estimate_amount or 0)
         new_net_paid = net_paid + amount
-        if ref_total > 0 and new_net_paid > ref_total and not confirm_overpay:
+        if ref_total > 0 and new_net_paid > ref_total:
             excess = new_net_paid - ref_total
-            raise NeedsConfirmation(f"This payment exceeds the reference total by {format_inr(excess)}. Confirm overpayment?")
+            from app.services.items import add_item
 
-        stored_amount = amount
-        audit_reason = "overpayment confirmed" if (ref_total > 0 and new_net_paid > ref_total) else None
+            add_item(
+                db=db,
+                ticket=ticket,
+                item_type="labor",
+                description="Labor",
+                price_charged=excess,
+                now=current_time,
+                bypass_pin=True,
+            )
+            stored_amount = amount
+            audit_reason = "auto-added labor for excess payment"
+        elif items_total == 0 and (ticket.estimate_amount or 0) == 0 and kind == PaymentKind.FINAL.value:
+            excess = amount
+            from app.services.items import add_item
+
+            add_item(
+                db=db,
+                ticket=ticket,
+                item_type="labor",
+                description="Labor",
+                price_charged=excess,
+                now=current_time,
+                bypass_pin=True,
+            )
+            stored_amount = amount
+            audit_reason = "auto-added labor for final payment"
+        else:
+            stored_amount = amount
+            audit_reason = None
 
     payment = Payment(
         ticket_id=ticket.id,

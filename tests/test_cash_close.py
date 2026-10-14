@@ -135,3 +135,78 @@ def test_day_boundary_2359_vs_0001(temp_db):
     # Check Day Oct 11
     sum_oct11 = compute_day_cash_summary(temp_db, datetime(2026, 10, 11).date(), opening_cash=0)
     assert sum_oct11["cash_net"] == 800
+
+
+def test_reopen_cash_day_http_route(temp_db):
+    """Test HTTP POST /cash/{date}/reopen requires reason and valid PIN."""
+    from fastapi.testclient import TestClient
+
+    from app.db import get_db
+    from app.main import app
+
+    setting = temp_db.query(SettingsModel).filter_by(id=1).first()
+    setting.owner_pin_hash = hash_secret("1234")
+    setting.admin_password_hash = hash_secret("admin123")
+    setting.setup_completed = True
+    temp_db.commit()
+
+    day_t = business_date()
+    close_cash_day(temp_db, day_t, opening_cash=0, counted_cash=3000)
+    temp_db.commit()
+
+    def override_get_db():
+        try:
+            yield temp_db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with TestClient(app, follow_redirects=False) as client:
+        # Log in
+        login_res = client.post("/login", data={"password": "admin123"})
+        assert login_res.status_code == 303
+
+        # Get cash page to fetch CSRF token
+        page_res = client.get(f"/cash?date={day_t.isoformat()}")
+        assert page_res.status_code == 200
+        import re
+        m = re.search(r'name="csrf_token"\s+value="([^"]+)"', page_res.text)
+        csrf_token = m.group(1) if m else ""
+
+        # Reopen without reason should fail with 422
+        bad_res = client.post(
+            f"/cash/{day_t.isoformat()}/reopen",
+            data={
+                "csrf_token": csrf_token,
+                "owner_pin": "1234",
+                "reason": "",
+            },
+        )
+        assert bad_res.status_code == 422
+
+        # Reopen with wrong PIN should fail with 403
+        wrong_pin_res = client.post(
+            f"/cash/{day_t.isoformat()}/reopen",
+            data={
+                "csrf_token": csrf_token,
+                "owner_pin": "9999",
+                "reason": "Late cash payment received",
+            },
+        )
+        assert wrong_pin_res.status_code == 403
+
+        # Reopen with valid PIN and reason should succeed (303 redirect)
+        ok_res = client.post(
+            f"/cash/{day_t.isoformat()}/reopen",
+            data={
+                "csrf_token": csrf_token,
+                "owner_pin": "1234",
+                "reason": "Late cash payment received from customer",
+            },
+        )
+        assert ok_res.status_code == 303
+        assert ok_res.headers["location"] == f"/cash?date={day_t.isoformat()}"
+
+    app.dependency_overrides.clear()
+

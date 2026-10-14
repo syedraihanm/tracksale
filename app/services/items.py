@@ -21,13 +21,15 @@ def add_item(
     cost_price: int = 0,
     supplier_name: str | None = None,
     owner_pin: str | None = None,
+    inventory_item_id: int | None = None,
     now: datetime | None = None,
+    bypass_pin: bool = False,
 ) -> TicketItem:
     """Add a line item (labor or part) to a ticket."""
     current_time = now or utc_now()
 
     # If ticket is delivered, PIN required (A-10)
-    if ticket.status == TicketStatus.DELIVERED.value:
+    if ticket.status == TicketStatus.DELIVERED.value and not bypass_pin:
         setting = db.query(SettingsModel).filter_by(id=1).first()
         if not owner_pin or not setting or not setting.owner_pin_hash or not verify_secret(setting.owner_pin_hash, owner_pin.strip()):
             raise PinRequired("Modifying items on a delivered ticket requires the Owner PIN.")
@@ -42,6 +44,7 @@ def add_item(
     if item_type not in (ItemType.LABOR.value, ItemType.PART.value):
         raise ValidationFailed("Item type must be labor or part")
 
+    linked_inv_id = None
     if item_type == ItemType.LABOR.value:
         cost_price = 0
         supplier_name = None
@@ -49,6 +52,30 @@ def add_item(
         if cost_price < 0 or cost_price > 10_00_000:
             raise ValidationFailed("Cost price must be between 0 and ₹10,00,000")
         supplier_name = supplier_name.strip() if supplier_name else None
+
+        # Check and link inventory item if selected
+        if inventory_item_id:
+            from app.services.inventory import adjust_inventory_stock, get_inventory_item
+
+            inv_item = get_inventory_item(db, inventory_item_id)
+            if not inv_item:
+                raise ValidationFailed("Selected inventory item not found")
+            if inv_item.quantity <= 0:
+                raise ValidationFailed(f"Spare part '{inv_item.spare_type.title()} ({inv_item.model})' is out of stock")
+
+            if cost_price == 0 and inv_item.cost_price > 0:
+                cost_price = inv_item.cost_price
+            if not supplier_name and inv_item.supplier_name:
+                supplier_name = inv_item.supplier_name
+
+            adjust_inventory_stock(
+                db=db,
+                item=inv_item,
+                delta=-1,
+                reason=f"Used in ticket {ticket.ticket_no}",
+                now=current_time,
+            )
+            linked_inv_id = inv_item.id
 
     item = TicketItem(
         ticket_id=ticket.id,
@@ -58,6 +85,7 @@ def add_item(
         price_charged=price_charged,
         cost_price=cost_price,
         supplier_name=supplier_name,
+        inventory_item_id=linked_inv_id,
         is_deleted=False,
     )
     db.add(item)
@@ -161,6 +189,19 @@ def delete_item(
     item.is_deleted = True
     item.updated_at = current_time
 
+    if item.inventory_item_id and item.type == ItemType.PART.value:
+        from app.services.inventory import adjust_inventory_stock, get_inventory_item
+
+        inv_item = get_inventory_item(db, item.inventory_item_id)
+        if inv_item:
+            adjust_inventory_stock(
+                db=db,
+                item=inv_item,
+                delta=1,
+                reason=f"Replenished from deleted line item on ticket {ticket.ticket_no}",
+                now=current_time,
+            )
+
     record_audit(
         db=db,
         entity="item",
@@ -170,4 +211,5 @@ def delete_item(
         now=current_time,
     )
 
+    db.flush()
     return item

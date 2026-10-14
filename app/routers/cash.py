@@ -144,11 +144,12 @@ def cash_reopen_post(
     request: Request,
     date_str: str,
     owner_pin: str = Form(...),
+    reason: str = Form(...),
     db: Session = Depends(get_db),
 ):
     try:
         target_date = date.fromisoformat(date_str)
-        reopen_cash_day(db, target_date, owner_pin=owner_pin)
+        reopen_cash_day(db, target_date, owner_pin=owner_pin, reason=reason)
         db.commit()
     except PinRequired as e:
         db.rollback()

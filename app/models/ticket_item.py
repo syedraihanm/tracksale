@@ -7,6 +7,7 @@ from app.db import Base
 from app.models.base import TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.inventory import InventoryItem
     from app.models.ticket import Ticket
 
 
@@ -32,6 +33,12 @@ class TicketItem(Base, TimestampMixin):
     price_charged: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cost_price: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     supplier_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    inventory_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("inventory_items.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     ticket: Mapped["Ticket"] = relationship("Ticket", back_populates="items")
+    inventory_item: Mapped["InventoryItem | None"] = relationship("InventoryItem", back_populates="ticket_items")

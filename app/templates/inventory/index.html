@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+
+{% block title %}Spares Inventory - Mobile Care{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header & Action Bar -->
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                Spares Inventory
+            </h1>
+            <p class="text-xs text-slate-500 mt-0.5">Manage spare parts stock for mobile repairs (Display, Backdoor, Battery, Camera, Motherboard, Charger Board, Glass)</p>
+        </div>
+
+        <button type="button"
+                onclick="document.getElementById('add-spare-modal').classList.remove('hidden')"
+                class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center gap-1.5 self-start md:self-auto">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Spare Part
+        </button>
+    </div>
+
+    <!-- Summary Metric KPI Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs text-slate-500 font-medium">Total Spare Items</span>
+            <div class="text-2xl font-bold text-slate-800 mt-1 font-mono">{{ total_spares }}</div>
+            <span class="text-[11px] text-slate-400">Unique catalog models</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs text-slate-500 font-medium">Total Units in Stock</span>
+            <div class="text-2xl font-bold text-emerald-600 mt-1 font-mono">{{ total_quantity }}</div>
+            <span class="text-[11px] text-slate-400">Available across all spares</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs text-slate-500 font-medium">Low Stock Items</span>
+            <div class="text-2xl font-bold text-amber-600 mt-1 font-mono">{{ low_stock }}</div>
+            <span class="text-[11px] text-slate-400">1 to 2 units left</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <span class="text-xs text-slate-500 font-medium">Out of Stock</span>
+            <div class="text-2xl font-bold {% if out_of_stock > 0 %}text-red-600{% else %}text-slate-400{% endif %} mt-1 font-mono">{{ out_of_stock }}</div>
+            <span class="text-[11px] text-slate-400">Needs replenishment</span>
+        </div>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+        <form method="GET" action="/inventory" class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <!-- Category Chips -->
+            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                <a href="/inventory?category=all{% if search_query %}&q={{ search_query }}{% endif %}"
+                   class="px-3 py-1 rounded-full border font-medium transition {% if selected_category == 'all' %}bg-slate-800 text-white border-slate-800{% else %}bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100{% endif %}">
+                    All Spares
+                </a>
+                {% for cat in categories %}
+                <a href="/inventory?category={{ cat }}{% if search_query %}&q={{ search_query }}{% endif %}"
+                   class="px-3 py-1 rounded-full border font-medium capitalize transition {% if selected_category == cat %}bg-slate-800 text-white border-slate-800{% else %}bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100{% endif %}">
+                    {{ cat }}
+                </a>
+                {% endfor %}
+            </div>
+
+            <!-- Search Field -->
+            <div class="relative w-full md:w-72">
+                <input type="hidden" name="category" value="{{ selected_category }}">
+                <input type="text"
+                       name="q"
+                       value="{{ search_query }}"
+                       placeholder="Search model, supplier, notes..."
+                       class="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+        </form>
+    </div>
+
+    <!-- Spares Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {% if items %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                    <tr>
+                        <th class="px-5 py-3">Category</th>
+                        <th class="px-5 py-3">Device Model</th>
+                        <th class="px-5 py-3 text-center">Stock Level</th>
+                        <th class="px-5 py-3 text-right">Cost Price</th>
+                        <th class="px-5 py-3 text-right">Selling Price</th>
+                        <th class="px-5 py-3">Supplier</th>
+                        <th class="px-5 py-3">Notes</th>
+                        <th class="px-5 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for it in items %}
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <!-- Spare Category Badge -->
+                        <td class="px-5 py-3 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize
+                                {% if it.spare_type == 'display' %}bg-blue-50 text-blue-700 border border-blue-200
+                                {% elif it.spare_type == 'battery' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+                                {% elif it.spare_type == 'backdoor' %}bg-purple-50 text-purple-700 border border-purple-200
+                                {% elif it.spare_type == 'motherboard' %}bg-indigo-50 text-indigo-700 border border-indigo-200
+                                {% elif it.spare_type == 'camera' %}bg-pink-50 text-pink-700 border border-pink-200
+                                {% elif it.spare_type == 'charger board' %}bg-amber-50 text-amber-700 border border-amber-200
+                                {% elif it.spare_type == 'glass' %}bg-cyan-50 text-cyan-700 border border-cyan-200
+                                {% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                                {{ it.spare_type }}
+                            </span>
+                        </td>
+
+                        <!-- Model -->
+                        <td class="px-5 py-3 font-semibold text-slate-900">
+                            {{ it.model }}
+                        </td>
+
+                        <!-- Stock Level with Quick +/- buttons -->
+                        <td class="px-5 py-3 text-center whitespace-nowrap">
+                            <div class="inline-flex items-center gap-1.5">
+                                <form method="POST" action="/inventory/{{ it.id }}/stock" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                                    <input type="hidden" name="delta" value="-1">
+                                    <button type="submit"
+                                            title="Reduce stock by 1"
+                                            {% if it.quantity <= 0 %}disabled{% endif %}
+                                            class="w-5 h-5 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs disabled:opacity-30 disabled:cursor-not-allowed">
+                                        -
+                                    </button>
+                                </form>
+
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold
+                                    {% if it.quantity == 0 %}bg-red-100 text-red-700
+                                    {% elif it.quantity <= 2 %}bg-amber-100 text-amber-800
+                                    {% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                                    {{ it.quantity }} in stock
+                                </span>
+
+                                <form method="POST" action="/inventory/{{ it.id }}/stock" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                                    <input type="hidden" name="delta" value="1">
+                                    <button type="submit"
+                                            title="Increase stock by 1"
+                                            class="w-5 h-5 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs">
+                                        +
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+
+                        <!-- Cost Price -->
+                        <td class="px-5 py-3 text-right font-mono text-slate-700 whitespace-nowrap">
+                            {{ it.cost_price|inr }}
+                        </td>
+
+                        <!-- Selling Price -->
+                        <td class="px-5 py-3 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
+                            {% if it.selling_price > 0 %}{{ it.selling_price|inr }}{% else %}<span class="text-slate-400">-</span>{% endif %}
+                        </td>
+
+                        <!-- Supplier -->
+                        <td class="px-5 py-3 text-slate-600">
+                            {{ it.supplier_name or '-' }}
+                        </td>
+
+                        <!-- Notes -->
+                        <td class="px-5 py-3 text-slate-500 max-w-xs truncate" title="{{ it.notes or '' }}">
+                            {{ it.notes or '-' }}
+                        </td>
+
+                        <!-- Actions -->
+                        <td class="px-5 py-3 text-right whitespace-nowrap">
+                            <div class="inline-flex items-center gap-2">
+                                <button type="button"
+                                        onclick="openEditModal({{ it.id }}, '{{ it.spare_type|escape }}', '{{ it.model|escape }}', {{ it.quantity }}, {{ it.cost_price }}, {{ it.selling_price }}, '{{ (it.supplier_name or '')|escape }}', '{{ (it.notes or '')|escape }}')"
+                                        class="text-brand-600 hover:text-brand-800 font-medium text-xs">
+                                    Edit
+                                </button>
+                                <span class="text-slate-300">|</span>
+                                <form method="POST" action="/inventory/{{ it.id }}/delete" class="inline" onsubmit="return confirm('Remove spare part {{ it.model }} ({{ it.spare_type }})?')">
+                                    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                                    <button type="submit" class="text-red-500 hover:text-red-700 text-xs">
+                                        Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12 text-center space-y-3">
+            <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            </div>
+            <h3 class="text-sm font-semibold text-slate-800">No spare parts found</h3>
+            <p class="text-xs text-slate-500 max-w-md mx-auto">
+                {% if search_query or selected_category != 'all' %}
+                No spares matching your search/category filters. Try resetting the filters or add a new spare part.
+                {% else %}
+                Your inventory is currently empty. Start adding spare parts (displays, backdoors, batteries, etc.) to track stock and auto-select during repairs.
+                {% endif %}
+            </p>
+            <button type="button"
+                    onclick="document.getElementById('add-spare-modal').classList.remove('hidden')"
+                    class="mt-2 inline-flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg text-xs font-medium hover:bg-brand-700 transition">
+                + Add First Spare Part
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Modal: Add Spare Part -->
+<div id="add-spare-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full overflow-hidden" onclick="event.stopPropagation()">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center text-xs">+</span>
+                Add Spare Part to Inventory
+            </h3>
+            <button type="button" onclick="document.getElementById('add-spare-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form method="POST" action="/inventory" class="p-6 space-y-4 text-xs">
+            <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Spare Category *</label>
+                    <select name="spare_type" required class="w-full px-3 py-2 border border-slate-300 rounded-lg capitalize bg-white text-xs focus:ring-brand-500 focus:border-brand-500">
+                        <option value="display">Display</option>
+                        <option value="backdoor">Backdoor</option>
+                        <option value="battery">Battery</option>
+                        <option value="camera">Camera</option>
+                        <option value="motherboard">Motherboard</option>
+                        <option value="charger board">Charger Board</option>
+                        <option value="glass">Glass</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Device Model *</label>
+                    <input type="text" name="model" required placeholder="e.g. iPhone 13, Galaxy M31" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-brand-500 focus:border-brand-500">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Quantity *</label>
+                    <input type="number" name="quantity" min="0" value="1" required class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:ring-brand-500 focus:border-brand-500">
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Cost Price ₹</label>
+                    <input type="text" name="cost_price" value="0" placeholder="e.g. 1500" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:ring-brand-500 focus:border-brand-500">
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Selling Price ₹</label>
+                    <input type="text" name="selling_price" value="0" placeholder="e.g. 2200" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:ring-brand-500 focus:border-brand-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-medium text-slate-700 mb-1">Supplier Name (Optional)</label>
+                <input type="text" name="supplier_name" placeholder="e.g. Metro Spares, National Electronics" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-brand-500 focus:border-brand-500">
+            </div>
+
+            <div>
+                <label class="block font-medium text-slate-700 mb-1">Optional Notes</label>
+                <textarea name="notes" rows="2" placeholder="e.g. Original OLED grade, tested working, 30 days warranty" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-brand-500 focus:border-brand-500"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('add-spare-modal').classList.add('hidden')" class="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 transition">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg shadow-sm transition">
+                    Save Spare Part
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Spare Part -->
+<div id="edit-spare-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full overflow-hidden" onclick="event.stopPropagation()">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="font-bold text-slate-800 text-sm">
+                Edit Spare Part
+            </h3>
+            <button type="button" onclick="document.getElementById('edit-spare-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form id="edit-spare-form" method="POST" action="" class="p-6 space-y-4 text-xs">
+            <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Spare Category *</label>
+                    <select id="edit_spare_type" name="spare_type" required class="w-full px-3 py-2 border border-slate-300 rounded-lg capitalize bg-white text-xs focus:ring-brand-500 focus:border-brand-500">
+                        <option value="display">Display</option>
+                        <option value="backdoor">Backdoor</option>
+                        <option value="battery">Battery</option>
+                        <option value="camera">Camera</option>
+                        <option value="motherboard">Motherboard</option>
+                        <option value="charger board">Charger Board</option>
+                        <option value="glass">Glass</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Device Model *</label>
+                    <input type="text" id="edit_model" name="model" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-brand-500 focus:border-brand-500">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Quantity *</label>
+                    <input type="number" id="edit_quantity" name="quantity" min="0" required class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:ring-brand-500 focus:border-brand-500">
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Cost Price ₹</label>
+                    <input type="text" id="edit_cost_price" name="cost_price" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:ring-brand-500 focus:border-brand-500">
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Selling Price ₹</label>
+                    <input type="text" id="edit_selling_price" name="selling_price" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:ring-brand-500 focus:border-brand-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-medium text-slate-700 mb-1">Supplier Name (Optional)</label>
+                <input type="text" id="edit_supplier_name" name="supplier_name" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-brand-500 focus:border-brand-500">
+            </div>
+
+            <div>
+                <label class="block font-medium text-slate-700 mb-1">Optional Notes</label>
+                <textarea id="edit_notes" name="notes" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-brand-500 focus:border-brand-500"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('edit-spare-modal').classList.add('hidden')" class="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 transition">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg shadow-sm transition">
+                    Update Spare Part
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditModal(id, spare_type, model, quantity, cost_price, selling_price, supplier_name, notes) {
+    document.getElementById('edit-spare-form').action = '/inventory/' + id + '/edit';
+    document.getElementById('edit_spare_type').value = spare_type;
+    document.getElementById('edit_model').value = model;
+    document.getElementById('edit_quantity').value = quantity;
+    document.getElementById('edit_cost_price').value = cost_price;
+    document.getElementById('edit_selling_price').value = selling_price;
+    document.getElementById('edit_supplier_name').value = supplier_name || '';
+    document.getElementById('edit_notes').value = notes || '';
+    document.getElementById('edit-spare-modal').classList.remove('hidden');
+}
+</script>
+{% endblock %}

@@ -24,6 +24,7 @@ def route_add_item(
     cost_price: str = Form("0"),
     supplier_name: str | None = Form(None),
     owner_pin: str | None = Form(None),
+    inventory_item_id: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     ticket = db.query(Ticket).filter_by(id=id, is_deleted=False).first()
@@ -33,6 +34,7 @@ def route_add_item(
     try:
         price = parse_money(price_charged)
         cost = parse_money(cost_price)
+        inv_id = int(inventory_item_id.strip()) if (inventory_item_id and inventory_item_id.strip().isdigit()) else None
         add_item(
             db=db,
             ticket=ticket,
@@ -42,6 +44,7 @@ def route_add_item(
             cost_price=cost,
             supplier_name=supplier_name,
             owner_pin=owner_pin,
+            inventory_item_id=inv_id,
         )
         db.commit()
     except PinRequired as e:

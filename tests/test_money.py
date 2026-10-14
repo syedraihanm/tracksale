@@ -8,7 +8,6 @@ from app.security import hash_secret
 from app.services.cash_close import close_cash_day
 from app.services.errors import (
     DayClosed,
-    NeedsConfirmation,
     PinRequired,
     ValidationFailed,
 )
@@ -99,7 +98,7 @@ def test_refund_constraints(temp_db):
 
 
 def test_overpayment_confirmation(temp_db):
-    """Adding payment exceeding reference total raises NeedsConfirmation unless confirmed."""
+    """Adding payment exceeding reference total automatically adds the excess amount as labor."""
     ticket = create_ticket(
         db=temp_db,
         customer_phone="9820034567",
@@ -108,18 +107,54 @@ def test_overpayment_confirmation(temp_db):
         device_model="V20",
         reported_issue="Charging port",
     )
-    add_item(temp_db, ticket, item_type="labor", description="Port fix", price_charged=400)
+    add_item(temp_db, ticket, item_type="part", description="Charging Port Board", price_charged=400, cost_price=200)
     temp_db.commit()
 
-    # Attempting to pay ₹500 without confirmation
-    with pytest.raises(NeedsConfirmation) as exc:
-        add_payment(temp_db, ticket, amount=500, mode="cash", kind=PaymentKind.FINAL.value, confirm_overpay=False)
-    assert "exceeds the reference total" in str(exc.value)
-
-    # With confirm_overpay=True
-    pay = add_payment(temp_db, ticket, amount=500, mode="cash", kind=PaymentKind.FINAL.value, confirm_overpay=True)
+    # Paying ₹500 (exceeds ₹400 by ₹100) - automatically adds ₹100 labor
+    pay = add_payment(temp_db, ticket, amount=500, mode="cash", kind=PaymentKind.FINAL.value)
     temp_db.commit()
     assert pay.amount == 500
+
+    items_total, net_paid, balance_due = get_ticket_totals(ticket)
+    assert net_paid == 500
+    assert items_total == 500
+    assert balance_due == 0
+
+    # Verify that a Labor item with ₹100 was automatically added
+    labor_items = [i for i in ticket.items if not i.is_deleted and i.type == "labor"]
+    assert len(labor_items) == 1
+    assert labor_items[0].price_charged == 100
+    assert labor_items[0].description == "Labor"
+
+
+def test_exceeding_payment_adds_labor_automatically(temp_db):
+    """When payment exceeds reference total by ₹500, ₹500 is added as labor automatically."""
+    ticket = create_ticket(
+        db=temp_db,
+        customer_phone="9820055555",
+        customer_name="Auto Labor Tester",
+        device_brand="Apple",
+        device_model="iPhone 13",
+        reported_issue="Screen shattered",
+    )
+    # Add a Part item for ₹2000
+    add_item(temp_db, ticket, item_type="part", description="OLED Screen", price_charged=2000, cost_price=1200)
+    temp_db.commit()
+
+    # Customer pays ₹2500 (exceeds ₹2000 by ₹500)
+    pay = add_payment(temp_db, ticket, amount=2500, mode="upi", kind=PaymentKind.FINAL.value)
+    temp_db.commit()
+
+    assert pay.amount == 2500
+    items_total, net_paid, balance_due = get_ticket_totals(ticket)
+    assert items_total == 2500
+    assert net_paid == 2500
+    assert balance_due == 0
+
+    # Check auto-added labor item
+    labor_item = next(i for i in ticket.items if not i.is_deleted and i.type == "labor")
+    assert labor_item.price_charged == 500
+    assert labor_item.description == "Labor"
 
 
 def test_no_orphan_payments(temp_db):
