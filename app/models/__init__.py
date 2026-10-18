@@ -17,6 +17,7 @@ from app.models.inventory import InventoryItem
 from app.models.payment import Payment
 from app.models.settings import Settings
 from app.models.status_history import StatusHistory
+from app.models.supplier import Supplier, SupplierPayment
 from app.models.ticket import Ticket
 from app.models.ticket_item import TicketItem
 
@@ -37,6 +38,8 @@ __all__ = [
     "Settings",
     "SpareCategory",
     "StatusHistory",
+    "Supplier",
+    "SupplierPayment",
     "Ticket",
     "TicketItem",
     "TicketStatus",

@@ -255,7 +255,7 @@ Open [http://localhost:8000](http://localhost:8000).
 
 ### Running Tests & Linting:
 ```bash
-# Run complete test suite (46 tests)
+# Run complete test suite (60 tests)
 uv run pytest
 
 # Run with test coverage report on service layer
@@ -276,13 +276,14 @@ uv run python -c "from app.services.backup import create_backup; print(create_ba
 
 ### Status:
 - All core milestones and acceptance criteria (AC1 to AC9) are implemented and verified.
-- Full test suite passes (46 of 46 tests passing with zero failures).
+- Full test suite passes (60 of 60 tests passing with zero failures).
 
 ### Architectural Quirks & Known Considerations:
-1. **Inventory Migration in Alembic:** The table `inventory_items` and `ticket_items.inventory_item_id` (along with the anti-delete trigger `trg_no_delete_inventory_items`) are fully provisioned and tracked by Alembic migration `a1b2c3d4e5f6_add_inventory_schema.py`. Zero-drift validation is verified in `test_alembic_migrations_and_zero_drift`.
-2. **WeasyPrint Fallback:** Thermal receipts and invoices use browser print styles (`@media print`) and print CSS rather than server-side headless browser generation (e.g. WeasyPrint) due to Windows binary compilation complexities (ADR `A-01`).
-3. **Single Shop Design:** The system is single-tenant and single-shop. Admin authentication uses a single admin password and an owner PIN stored in the `settings` table rather than a multi-user RBAC table (ADR `A-28`).
-4. **Soft Delete Policy:** No rows are physically deleted from operational tables. Soft-deletion flags (`is_deleted=True`) with deletion reasons are used throughout.
+1. **Suppliers & Ledger System:** Suppliers and payments are tracked in tables `suppliers` and `supplier_payments`, with foreign key links `ticket_items.supplier_id` and `inventory_items.supplier_id`. Migrations are tracked in `b2c3d4e5f6a7_add_suppliers_schema.py`. Anti-delete triggers protect both tables (`trg_no_delete_suppliers` and `trg_no_delete_supplier_payments`).
+2. **Inventory Migration in Alembic:** The table `inventory_items` and `ticket_items.inventory_item_id` (along with the anti-delete trigger `trg_no_delete_inventory_items`) are fully provisioned and tracked by Alembic migration `a1b2c3d4e5f6_add_inventory_schema.py`.
+3. **WeasyPrint Fallback:** Thermal receipts and invoices use browser print styles (`@media print`) and print CSS rather than server-side headless browser generation (e.g. WeasyPrint) due to Windows binary compilation complexities (ADR `A-01`).
+4. **Single Shop Design:** The system is single-tenant and single-shop. Admin authentication uses a single admin password and an owner PIN stored in the `settings` table rather than a multi-user RBAC table (ADR `A-28`).
+5. **Soft Delete Policy:** No rows are physically deleted from operational tables. Soft-deletion flags (`is_deleted=True`) with deletion reasons are used throughout.
 
 ---
 

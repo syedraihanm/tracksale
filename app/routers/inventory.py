@@ -49,6 +49,9 @@ def inventory_list_view(
         spare_type=category if category != "all" else None,
     )
 
+    from app.services.suppliers import list_suppliers
+    suppliers = list_suppliers(db, active_only=True)
+
     context = {
         "request": request,
         "session": session,
@@ -61,6 +64,7 @@ def inventory_list_view(
         "categories": SPARE_CATEGORIES,
         "selected_category": category,
         "search_query": q,
+        "suppliers": suppliers,
     }
 
     return templates.TemplateResponse(request=request, name="inventory/index.html", context=context)
@@ -76,6 +80,7 @@ def route_add_inventory_item(
     cost_price: str = Form("0"),
     selling_price: str = Form("0"),
     supplier_name: str | None = Form(None),
+    supplier_id: str | None = Form(None),
     notes: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
@@ -84,6 +89,7 @@ def route_add_inventory_item(
         qty = int(quantity.strip()) if quantity.strip() else 1
         cost = parse_money(cost_price)
         sell = parse_money(selling_price)
+        sup_id = int(supplier_id.strip()) if (supplier_id and supplier_id.strip().isdigit()) else None
         add_inventory_item(
             db=db,
             spare_type=spare_type,
@@ -92,6 +98,7 @@ def route_add_inventory_item(
             cost_price=cost,
             selling_price=sell,
             supplier_name=supplier_name,
+            supplier_id=sup_id,
             notes=notes,
         )
         db.commit()
@@ -112,6 +119,7 @@ def route_edit_inventory_item(
     cost_price: str = Form("0"),
     selling_price: str = Form("0"),
     supplier_name: str | None = Form(None),
+    supplier_id: str | None = Form(None),
     notes: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
@@ -124,6 +132,7 @@ def route_edit_inventory_item(
         qty = int(quantity.strip()) if quantity.strip() else 0
         cost = parse_money(cost_price)
         sell = parse_money(selling_price)
+        sup_id = int(supplier_id.strip()) if (supplier_id and supplier_id.strip().isdigit()) else None
         edit_inventory_item(
             db=db,
             item=item,
@@ -133,6 +142,7 @@ def route_edit_inventory_item(
             cost_price=cost,
             selling_price=sell,
             supplier_name=supplier_name,
+            supplier_id=sup_id,
             notes=notes,
         )
         db.commit()

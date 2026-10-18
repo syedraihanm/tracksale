@@ -80,7 +80,7 @@ def create_ticket(
     customer_name: str,
     device_brand: str,
     device_model: str,
-    reported_issue: str,
+    reported_issue: str | None = None,
     issue_category: str = "Other",
     imei_or_serial: str | None = None,
     color: str | None = None,
@@ -107,14 +107,16 @@ def create_ticket(
     # Validations
     device_brand = device_brand.strip().strip("'\"\\").strip()
     device_model = device_model.strip().strip("'\"\\").strip()
-    reported_issue = reported_issue.strip()
+    clean_issue = reported_issue.strip() if reported_issue else ""
+    if not clean_issue:
+        clean_issue = issue_category or "Repair service"
+    elif len(clean_issue) > 1000:
+        raise ValidationFailed("Reported issue must not exceed 1000 characters")
 
     if not device_brand or len(device_brand) > 60:
         raise ValidationFailed("Device brand must be between 1 and 60 characters")
     if not device_model or len(device_model) > 60:
         raise ValidationFailed("Device model must be between 1 and 60 characters")
-    if not reported_issue or len(reported_issue) < 3 or len(reported_issue) > 1000:
-        raise ValidationFailed("Reported issue must be between 3 and 1000 characters")
 
     setting = db.query(SettingsModel).filter_by(id=1).first()
     default_warranty = setting.default_warranty_days if setting else 30
@@ -140,7 +142,7 @@ def create_ticket(
         imei_or_serial=imei_or_serial.strip() if imei_or_serial else None,
         color=color.strip() if color else None,
         passcode_encrypted=encrypt_passcode(passcode.strip()) if passcode else None,
-        reported_issue=reported_issue,
+        reported_issue=clean_issue,
         issue_category=issue_category,
         intake_condition=condition,
         estimate_amount=estimate_amount if (estimate_amount and estimate_amount >= 0) else None,
@@ -196,8 +198,8 @@ def update_ticket_details(
     ticket: Ticket,
     device_brand: str,
     device_model: str,
-    reported_issue: str,
-    issue_category: str,
+    reported_issue: str | None = None,
+    issue_category: str = "Other",
     imei_or_serial: str | None = None,
     color: str | None = None,
     estimate_amount: int | None = None,
@@ -221,8 +223,14 @@ def update_ticket_details(
     track_change("device_model", ticket.device_model, clean_model)
     ticket.device_model = clean_model
 
-    track_change("reported_issue", ticket.reported_issue, reported_issue.strip())
-    ticket.reported_issue = reported_issue.strip()
+    clean_issue = reported_issue.strip() if reported_issue else ""
+    if not clean_issue:
+        clean_issue = issue_category or ticket.issue_category or "Repair service"
+    elif len(clean_issue) > 1000:
+        raise ValidationFailed("Reported issue must not exceed 1000 characters")
+
+    track_change("reported_issue", ticket.reported_issue, clean_issue)
+    ticket.reported_issue = clean_issue
 
     track_change("issue_category", ticket.issue_category, issue_category)
     ticket.issue_category = issue_category

@@ -13,6 +13,12 @@ def test_seeded_data_metrics_invariants():
     try:
         today = business_date()
         from_d = today - timedelta(days=90)
+
+        total_tickets = db.query(Ticket).count()
+        if total_tickets == 0:
+            import pytest
+            pytest.skip("Database is empty (not seeded with demo data).")
+
         # Check overall 90-day dashboard metrics
         metrics = compute_reports(db, from_date=from_d, to_date=today)
 

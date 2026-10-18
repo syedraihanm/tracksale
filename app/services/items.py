@@ -20,6 +20,7 @@ def add_item(
     price_charged: int,
     cost_price: int = 0,
     supplier_name: str | None = None,
+    supplier_id: int | None = None,
     owner_pin: str | None = None,
     inventory_item_id: int | None = None,
     now: datetime | None = None,
@@ -48,6 +49,7 @@ def add_item(
     if item_type == ItemType.LABOR.value:
         cost_price = 0
         supplier_name = None
+        supplier_id = None
     else:
         if cost_price < 0 or cost_price > 10_00_000:
             raise ValidationFailed("Cost price must be between 0 and ₹10,00,000")
@@ -67,6 +69,8 @@ def add_item(
                 cost_price = inv_item.cost_price
             if not supplier_name and inv_item.supplier_name:
                 supplier_name = inv_item.supplier_name
+            if not supplier_id and inv_item.supplier_id:
+                supplier_id = inv_item.supplier_id
 
             adjust_inventory_stock(
                 db=db,
@@ -77,6 +81,22 @@ def add_item(
             )
             linked_inv_id = inv_item.id
 
+        # Resolve or match supplier
+        if supplier_id:
+            from app.services.suppliers import get_supplier
+            sup = get_supplier(db, supplier_id)
+            if sup:
+                supplier_name = sup.name
+                supplier_id = sup.id
+            else:
+                supplier_id = None
+        elif supplier_name:
+            from app.services.suppliers import get_supplier_by_name
+            sup = get_supplier_by_name(db, supplier_name)
+            if sup:
+                supplier_id = sup.id
+                supplier_name = sup.name
+
     item = TicketItem(
         ticket_id=ticket.id,
         ticket=ticket,
@@ -85,6 +105,7 @@ def add_item(
         price_charged=price_charged,
         cost_price=cost_price,
         supplier_name=supplier_name,
+        supplier_id=supplier_id,
         inventory_item_id=linked_inv_id,
         is_deleted=False,
     )
@@ -115,6 +136,7 @@ def edit_item(
     price_charged: int,
     cost_price: int = 0,
     supplier_name: str | None = None,
+    supplier_id: int | None = None,
     owner_pin: str | None = None,
     now: datetime | None = None,
 ) -> TicketItem:
@@ -137,10 +159,26 @@ def edit_item(
     if item.type == ItemType.LABOR.value:
         cost_price = 0
         supplier_name = None
+        supplier_id = None
     else:
         if cost_price < 0:
             raise ValidationFailed("Cost price must be >= 0")
         supplier_name = supplier_name.strip() if supplier_name else None
+
+        if supplier_id:
+            from app.services.suppliers import get_supplier
+            sup = get_supplier(db, supplier_id)
+            if sup:
+                supplier_name = sup.name
+                supplier_id = sup.id
+            else:
+                supplier_id = None
+        elif supplier_name:
+            from app.services.suppliers import get_supplier_by_name
+            sup = get_supplier_by_name(db, supplier_name)
+            if sup:
+                supplier_id = sup.id
+                supplier_name = sup.name
 
     changes = {}
     if item.description != description:
@@ -155,6 +193,9 @@ def edit_item(
     if item.supplier_name != supplier_name:
         changes["supplier_name"] = {"old": item.supplier_name, "new": supplier_name}
         item.supplier_name = supplier_name
+    if item.supplier_id != supplier_id:
+        changes["supplier_id"] = {"old": item.supplier_id, "new": supplier_id}
+        item.supplier_id = supplier_id
 
     if changes:
         item.updated_at = current_time

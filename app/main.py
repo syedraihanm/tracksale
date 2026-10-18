@@ -116,6 +116,7 @@ from app.routers import (
     payments,
     queue,
     search,
+    suppliers,
     tickets,
 )
 from app.routers import (
@@ -128,6 +129,7 @@ app.include_router(queue.router)
 app.include_router(tickets.router)
 app.include_router(items.router)
 app.include_router(inventory.router)
+app.include_router(suppliers.router)
 app.include_router(payments.router)
 app.include_router(search.router)
 app.include_router(customers.router)

@@ -108,6 +108,24 @@ def temp_db():
             END;
             """)
         )
+        conn.execute(
+            text("""
+            CREATE TRIGGER trg_no_delete_suppliers
+            BEFORE DELETE ON suppliers
+            BEGIN
+                SELECT RAISE(ABORT, 'Hard delete is forbidden on suppliers; use soft delete');
+            END;
+            """)
+        )
+        conn.execute(
+            text("""
+            CREATE TRIGGER trg_no_delete_supplier_payments
+            BEFORE DELETE ON supplier_payments
+            BEGIN
+                SELECT RAISE(ABORT, 'Hard delete is forbidden on supplier_payments; use soft delete');
+            END;
+            """)
+        )
         conn.commit()
 
 

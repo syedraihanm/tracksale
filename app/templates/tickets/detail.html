@@ -477,8 +477,26 @@
                                 <input type="text" name="cost_price" id="item_cost_price_input" value="0" placeholder="e.g. 1100" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded font-mono">
                             </div>
                             <div>
-                                <label class="block text-[11px] text-slate-600">Supplier Name (Optional)</label>
-                                <input type="text" name="supplier_name" id="item_supplier_name_input" placeholder="e.g. Metro Spares" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded">
+                                <label class="block text-[11px] text-slate-600 flex items-center justify-between">
+                                    <span>Supplier (Optional)</span>
+                                    {% if suppliers %}
+                                    <button type="button" onclick="toggleCustomSupplier()" id="toggle-custom-supplier-btn" class="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium">
+                                        + Custom / Other
+                                    </button>
+                                    {% endif %}
+                                </label>
+                                <div class="mt-1 space-y-1">
+                                    {% if suppliers %}
+                                    <select name="supplier_id" id="item_supplier_select" onchange="onSupplierSelectChange(this)" class="w-full px-2 py-1.5 border border-slate-300 rounded bg-white text-xs">
+                                        <option value="">-- Select Registered Supplier --</option>
+                                        {% for sup in suppliers %}
+                                        <option value="{{ sup.id }}" data-name="{{ sup.name }}">{{ sup.name }}{% if sup.phone %} ({{ sup.phone }}){% endif %}</option>
+                                        {% endfor %}
+                                        <option value="custom">-- Type New / Unregistered Supplier --</option>
+                                    </select>
+                                    {% endif %}
+                                    <input type="text" name="supplier_name" id="item_supplier_name_input" placeholder="Supplier name (e.g. Metro Spares)" class="{% if suppliers %}hidden{% endif %} w-full px-2 py-1.5 border border-slate-300 rounded text-xs">
+                                </div>
                             </div>
                         </div>
 
@@ -907,8 +925,26 @@ function selectInventoryItem(el) {
         } else if (cost && parseFloat(cost) > 0) {
             priceChargedInput.value = cost;
         }
+    if (supplierInput && supplier) {
+        supplierInput.value = supplier;
+        const supSelect = document.getElementById('item_supplier_select');
+        if (supSelect) {
+            let matched = false;
+            for (let i = 0; i < supSelect.options.length; i++) {
+                if (supSelect.options[i].getAttribute('data-name')?.toLowerCase() === supplier.toLowerCase()) {
+                    supSelect.selectedIndex = i;
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched) {
+                supplierInput.classList.add('hidden');
+            } else {
+                supSelect.value = 'custom';
+                supplierInput.classList.remove('hidden');
+            }
+        }
     }
-    if (supplierInput && supplier) supplierInput.value = supplier;
 
     // Show selected card
     const selectedCard = document.getElementById('inv_selected_card');
@@ -1020,6 +1056,47 @@ function onInventorySelect(select) {
     const supplier = opt.getAttribute('data-supplier');
     if (supplierInput && supplier) {
         supplierInput.value = supplier;
+    }
+}
+
+function onSupplierSelectChange(select) {
+    const nameInput = document.getElementById('item_supplier_name_input');
+    const toggleBtn = document.getElementById('toggle-custom-supplier-btn');
+    if (!nameInput) return;
+
+    if (select.value === 'custom') {
+        nameInput.classList.remove('hidden');
+        nameInput.value = '';
+        nameInput.focus();
+        if (toggleBtn) toggleBtn.innerText = '← Pick from list';
+    } else if (select.value) {
+        const opt = select.options[select.selectedIndex];
+        nameInput.value = opt.getAttribute('data-name') || '';
+        nameInput.classList.add('hidden');
+        if (toggleBtn) toggleBtn.innerText = '+ Custom / Other';
+    } else {
+        nameInput.value = '';
+        nameInput.classList.add('hidden');
+        if (toggleBtn) toggleBtn.innerText = '+ Custom / Other';
+    }
+}
+
+function toggleCustomSupplier() {
+    const select = document.getElementById('item_supplier_select');
+    const nameInput = document.getElementById('item_supplier_name_input');
+    const toggleBtn = document.getElementById('toggle-custom-supplier-btn');
+    if (!nameInput) return;
+
+    if (nameInput.classList.contains('hidden')) {
+        nameInput.classList.remove('hidden');
+        nameInput.focus();
+        if (select) select.value = 'custom';
+        if (toggleBtn) toggleBtn.innerText = '← Pick from list';
+    } else {
+        nameInput.classList.add('hidden');
+        if (select) select.value = '';
+        nameInput.value = '';
+        if (toggleBtn) toggleBtn.innerText = '+ Custom / Other';
     }
 }
 </script>

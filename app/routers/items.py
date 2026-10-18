@@ -23,6 +23,7 @@ def route_add_item(
     price_charged: str = Form(...),
     cost_price: str = Form("0"),
     supplier_name: str | None = Form(None),
+    supplier_id: str | None = Form(None),
     owner_pin: str | None = Form(None),
     inventory_item_id: str | None = Form(None),
     db: Session = Depends(get_db),
@@ -35,6 +36,7 @@ def route_add_item(
         price = parse_money(price_charged)
         cost = parse_money(cost_price)
         inv_id = int(inventory_item_id.strip()) if (inventory_item_id and inventory_item_id.strip().isdigit()) else None
+        sup_id = int(supplier_id.strip()) if (supplier_id and supplier_id.strip().isdigit()) else None
         add_item(
             db=db,
             ticket=ticket,
@@ -43,6 +45,7 @@ def route_add_item(
             price_charged=price,
             cost_price=cost,
             supplier_name=supplier_name,
+            supplier_id=sup_id,
             owner_pin=owner_pin,
             inventory_item_id=inv_id,
         )
@@ -65,6 +68,7 @@ def route_edit_item(
     price_charged: str = Form(...),
     cost_price: str = Form("0"),
     supplier_name: str | None = Form(None),
+    supplier_id: str | None = Form(None),
     owner_pin: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
@@ -75,6 +79,7 @@ def route_edit_item(
     try:
         price = parse_money(price_charged)
         cost = parse_money(cost_price)
+        sup_id = int(supplier_id.strip()) if (supplier_id and supplier_id.strip().isdigit()) else None
         edit_item(
             db=db,
             item=item,
@@ -82,6 +87,7 @@ def route_edit_item(
             price_charged=price,
             cost_price=cost,
             supplier_name=supplier_name,
+            supplier_id=sup_id,
             owner_pin=owner_pin,
         )
         db.commit()

@@ -20,7 +20,7 @@ def is_under_warranty(ticket: Ticket, check_date: date | None = None, now: datet
 def create_warranty_return(
     db: Session,
     parent_ticket: Ticket,
-    reported_issue: str,
+    reported_issue: str | None = None,
     issue_category: str = "Other",
     technician_note: str | None = None,
     now: datetime | None = None,

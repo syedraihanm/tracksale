@@ -73,7 +73,7 @@ async def ticket_create(
     customer_name: str = Form(...),
     device_brand: str = Form(...),
     device_model: str = Form(...),
-    reported_issue: str = Form(...),
+    reported_issue: str | None = Form(None),
     issue_category: str = Form("Other"),
     imei_or_serial: str | None = Form(None),
     color: str | None = Form(None),
@@ -204,7 +204,9 @@ def ticket_detail(request: Request, id: int, db: Session = Depends(get_db)):
     )
 
     from app.services.inventory import get_available_spares
+    from app.services.suppliers import list_suppliers
     available_inventory = get_available_spares(db)
+    active_suppliers = list_suppliers(db, active_only=True)
 
     return templates.TemplateResponse(
         request=request,
@@ -226,6 +228,7 @@ def ticket_detail(request: Request, id: int, db: Session = Depends(get_db)):
             "wa_ready_url": wa_ready,
             "categories": ISSUE_CATEGORIES,
             "available_inventory": available_inventory,
+            "suppliers": active_suppliers,
         },
     )
 
@@ -236,7 +239,7 @@ def ticket_edit(
     id: int,
     device_brand: str = Form(...),
     device_model: str = Form(...),
-    reported_issue: str = Form(...),
+    reported_issue: str | None = Form(None),
     issue_category: str = Form(...),
     imei_or_serial: str | None = Form(None),
     color: str | None = Form(None),

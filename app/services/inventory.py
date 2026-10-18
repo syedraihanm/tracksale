@@ -65,6 +65,7 @@ def add_inventory_item(
     cost_price: int = 0,
     selling_price: int = 0,
     supplier_name: str | None = None,
+    supplier_id: int | None = None,
     notes: str | None = None,
     now: datetime | None = None,
 ) -> InventoryItem:
@@ -84,13 +85,30 @@ def add_inventory_item(
     if selling_price < 0 or selling_price > 10_00_000:
         raise ValidationFailed("Selling price must be between 0 and ₹10,00,000")
 
+    clean_supp = supplier_name.strip() if supplier_name else None
+    if supplier_id:
+        from app.services.suppliers import get_supplier
+        sup = get_supplier(db, supplier_id)
+        if sup:
+            clean_supp = sup.name
+            supplier_id = sup.id
+        else:
+            supplier_id = None
+    elif clean_supp:
+        from app.services.suppliers import get_supplier_by_name
+        sup = get_supplier_by_name(db, clean_supp)
+        if sup:
+            supplier_id = sup.id
+            clean_supp = sup.name
+
     item = InventoryItem(
         spare_type=st,
         model=md,
         quantity=quantity,
         cost_price=cost_price,
         selling_price=selling_price,
-        supplier_name=supplier_name.strip() if supplier_name else None,
+        supplier_name=clean_supp,
+        supplier_id=supplier_id,
         notes=notes.strip() if notes else None,
         is_deleted=False,
     )
@@ -109,6 +127,7 @@ def add_inventory_item(
             "cost_price": {"old": None, "new": cost_price},
             "selling_price": {"old": None, "new": selling_price},
             "supplier_name": {"old": None, "new": item.supplier_name},
+            "supplier_id": {"old": None, "new": item.supplier_id},
         },
         now=current_time,
     )
@@ -125,6 +144,7 @@ def edit_inventory_item(
     cost_price: int = 0,
     selling_price: int = 0,
     supplier_name: str | None = None,
+    supplier_id: int | None = None,
     notes: str | None = None,
     now: datetime | None = None,
 ) -> InventoryItem:
@@ -145,6 +165,21 @@ def edit_inventory_item(
         raise ValidationFailed("Selling price must be between 0 and ₹10,00,000")
 
     supp = supplier_name.strip() if supplier_name else None
+    if supplier_id:
+        from app.services.suppliers import get_supplier
+        sup = get_supplier(db, supplier_id)
+        if sup:
+            supp = sup.name
+            supplier_id = sup.id
+        else:
+            supplier_id = None
+    elif supp:
+        from app.services.suppliers import get_supplier_by_name
+        sup = get_supplier_by_name(db, supp)
+        if sup:
+            supplier_id = sup.id
+            supp = sup.name
+
     nt = notes.strip() if notes else None
 
     changes: dict[str, Any] = {}
@@ -166,6 +201,9 @@ def edit_inventory_item(
     if item.supplier_name != supp:
         changes["supplier_name"] = {"old": item.supplier_name, "new": supp}
         item.supplier_name = supp
+    if item.supplier_id != supplier_id:
+        changes["supplier_id"] = {"old": item.supplier_id, "new": supplier_id}
+        item.supplier_id = supplier_id
     if item.notes != nt:
         changes["notes"] = {"old": item.notes, "new": nt}
         item.notes = nt

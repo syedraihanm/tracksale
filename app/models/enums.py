@@ -43,6 +43,8 @@ class AuditEntity(str, Enum):
     CASH_CLOSING = "cash_closing"
     SETTINGS = "settings"
     INVENTORY = "inventory"
+    SUPPLIER = "supplier"
+    SUPPLIER_PAYMENT = "supplier_payment"
 
 
 class AuditAction(str, Enum):

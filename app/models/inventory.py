@@ -1,12 +1,13 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.base import TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.supplier import Supplier
     from app.models.ticket_item import TicketItem
 
 
@@ -25,7 +26,13 @@ class InventoryItem(Base, TimestampMixin):
     cost_price: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     selling_price: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     supplier_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    supplier_id: Mapped[int | None] = mapped_column(
+        ForeignKey("suppliers.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
 
     ticket_items: Mapped[list["TicketItem"]] = relationship("TicketItem", back_populates="inventory_item")
+    supplier: Mapped["Supplier | None"] = relationship("Supplier", back_populates="inventory_items")

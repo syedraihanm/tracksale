@@ -15,4 +15,6 @@ templates.env.filters["inr"] = format_inr
 templates.env.filters["date_ist"] = format_date
 templates.env.filters["time_ist"] = format_time
 templates.env.filters["datetime_ist"] = format_datetime
+templates.env.filters["ist_datetime"] = format_datetime
+templates.env.filters["ist_date"] = format_date
 templates.env.filters["days_ago"] = days_ago

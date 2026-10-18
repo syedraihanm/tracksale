@@ -36,6 +36,9 @@
     <div class="receipt-container bg-white p-6 md:p-8 rounded-xl shadow-md border border-slate-200 text-slate-800 space-y-6">
         <!-- Header -->
         <div class="text-center pb-4 border-b border-slate-200">
+            <div class="flex justify-center mb-2">
+                <img src="/static/logo.png" alt="Shop Logo" class="h-16 w-16 object-cover rounded-full shadow-sm ring-1 ring-slate-200" onerror="this.style.display='none'" />
+            </div>
             <h1 class="text-xl font-extrabold uppercase tracking-wide text-slate-900">{{ setting.shop_name }}</h1>
             {% if setting.shop_address %}
             <p class="text-xs text-slate-500 mt-0.5">{{ setting.shop_address }}</p>
@@ -78,10 +81,13 @@
         <!-- Issue & Intake Condition -->
         <div class="text-xs space-y-2 pb-4 border-b border-slate-100">
             <div>
-                <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Reported Issue</span>
-                <p class="font-medium text-slate-800 bg-slate-50 p-2.5 rounded border border-slate-100 mt-1">
-                    {{ ticket.reported_issue }}
-                </p>
+                <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Issue / Problem</span>
+                <div class="bg-slate-50 p-2.5 rounded border border-slate-100 mt-1 space-y-1">
+                    <span class="font-bold text-slate-900 text-sm block">{{ ticket.issue_category }}</span>
+                    {% if ticket.reported_issue and ticket.reported_issue != ticket.issue_category %}
+                    <p class="font-medium text-slate-600 text-xs">{{ ticket.reported_issue }}</p>
+                    {% endif %}
+                </div>
             </div>
 
             {% if ticket.intake_condition %}
@@ -132,14 +138,6 @@
             </div>
         </div>
 
-        <!-- Inline SVG QR Code -->
-        <div class="flex flex-col items-center justify-center py-2 text-center">
-            <div class="w-36 h-36 flex items-center justify-center p-2 bg-white border border-slate-200 rounded-lg">
-                {{ qr_svg|safe }}
-            </div>
-            <span class="font-mono text-xs font-bold text-slate-600 mt-2 tracking-widest">{{ ticket.ticket_no }}</span>
-            <span class="text-[10px] text-slate-400">Scan QR to identify ticket quickly</span>
-        </div>
 
         <!-- Terms & Conditions -->
         <div class="pt-2 border-t border-slate-200 text-[10px] text-slate-500 leading-relaxed space-y-1">
