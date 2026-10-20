@@ -10,6 +10,10 @@ Get the project folder from GitHub, then double-click **`setup_shop_pc.bat`**. T
 
 Double-click **Amee Mobiles POS** and complete the first-run setup. Choose one 4–6 digit Shop PIN (for example, `1234`); it is used for both sign-in and owner authorization. The shop name is prefilled as **AMEE MOBILES**. The receipt terms and WhatsApp intake message are also preconfigured.
 
+## Build a Windows installer
+
+To build the self-contained Windows installer, install NSIS 3.13 and run `.\scripts\build_windows_exe.ps1` from PowerShell. The script bundles Python and the app into `dist\AmeeMobilesSetup.exe`. The installer creates desktop, Start menu, and silent Windows sign-in shortcuts; the shop PC does not need Python. App files are installed under the user's Local AppData Programs folder; the database, backups, logs, and generated secrets stay under `%LOCALAPPDATA%\AmeeMobiles` and are preserved by uninstall.
+
 For transfer details and fresh-install file exclusions, see [LOCAL_SETUP_GUIDE.md](LOCAL_SETUP_GUIDE.md). Local databases, backups, and `.env` secrets are intentionally excluded from Git.
 
 ## Local Development

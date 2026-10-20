@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 
@@ -41,7 +43,10 @@ def shell_navigation_counts(request):
         return {"nav_active_ticket_count": 0, "nav_ready_ticket_count": 0}
 
 
-templates = Jinja2Templates(directory="app/templates", context_processors=[shell_navigation_counts])
+templates = Jinja2Templates(
+    directory=str(Path(__file__).resolve().parent / "templates"),
+    context_processors=[shell_navigation_counts],
+)
 
 # Register custom Jinja filters on the shared environment
 templates.env.filters["inr"] = format_inr

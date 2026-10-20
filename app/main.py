@@ -48,7 +48,7 @@ app = FastAPI(
 )
 
 # Static files
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/static", StaticFiles(directory=str(Path(__file__).resolve().parent / "static")), name="static")
 
 
 # Security headers middleware
