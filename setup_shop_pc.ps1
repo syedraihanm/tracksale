@@ -53,11 +53,16 @@ try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             New-Item -ItemType Directory -Path $uvDirectory -Force | Out-Null
             $env:UV_INSTALL_DIR = $uvDirectory
-            $installerScript = (Invoke-WebRequest -UseBasicParsing -Uri 'https://astral.sh/uv/install.ps1').Content
-            if ([string]::IsNullOrWhiteSpace($installerScript)) {
-                throw 'Could not download the official uv installer.'
+            $installerPath = Join-Path $env:TEMP ("uv-install-{0}.ps1" -f [guid]::NewGuid().ToString('N'))
+            try {
+                Invoke-WebRequest -UseBasicParsing -Uri 'https://astral.sh/uv/install.ps1' -OutFile $installerPath
+                if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf) -or (Get-Item -LiteralPath $installerPath).Length -eq 0) {
+                    throw 'Could not download the official uv installer.'
+                }
+                & $installerPath
+            } finally {
+                Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
             }
-            Invoke-Expression $installerScript
         }
     }
 
@@ -153,7 +158,7 @@ try {
     Write-Host "`nSetup complete. Desktop shortcut: $desktopShortcutPath"
     Write-Host 'The server will start when this Windows user signs in.'
     Write-Host 'Double-click Amee Mobiles POS to open the shop app.'
-    Write-Host 'On a new database, complete the first-run shop name, password, and owner PIN setup in the app.'
+    Write-Host 'On a new database, complete the first-run shop name and Shop PIN setup in the app.'
 } catch {
     Write-Host "`nSETUP FAILED: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Details: $logPath"
