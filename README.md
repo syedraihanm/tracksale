@@ -4,46 +4,25 @@ A high-performance, local-first management system designed for Indian mobile rep
 
 ---
 
-## 🚀 Quick Start (Development & Local Demo)
+## Windows Shop Owner Setup (Fresh Shop)
 
-The project is managed exclusively with [`uv`](https://github.com/astral-sh/uv).
+Get the project folder from GitHub, then double-click **`setup_shop_pc.bat`**. The setup installs the required runtime and dependencies, prepares an empty database, and creates the Desktop shortcut **Amee Mobiles POS** plus a Windows sign-in startup shortcut. It does not seed sample tickets or import shop data.
 
-### 1. Prerequisites
-- Python 3.12+
-- `uv` installed (`curl -LsSf https://astral.sh/uv/install.sh | sh` or `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`)
+Double-click **Amee Mobiles POS** and complete the first-run password and Owner PIN setup. The shop name is prefilled as **AMEE MOBILES**. The receipt terms and WhatsApp intake message are also preconfigured.
 
-### 2. Setup Environment & Install Dependencies
+For transfer details and fresh-install file exclusions, see [LOCAL_SETUP_GUIDE.md](LOCAL_SETUP_GUIDE.md). Local databases, backups, and `.env` secrets are intentionally excluded from Git.
+
+## Local Development
+
+The project uses [`uv`](https://github.com/astral-sh/uv) and Python 3.12 or later.
+
 ```bash
-# Clone and enter directory
-cd service
-
-# Create virtual environment and install all dependencies
 uv sync
-```
-
-### 3. Initialize Database & Seed Demo Data
-```bash
-# Apply database migrations
 uv run alembic upgrade head
-
-# Seed 90 days of realistic shop data (~105 tickets, customers, cash closings)
-uv run python -m scripts.seed --reset
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-### 4. Start the Application
-```bash
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-Open **[http://localhost:8000](http://localhost:8000)** in your browser.
-
----
-
-## 🔑 Demo Credentials
-
-| Role / Feature | Credential | Description |
-|---|---|---|
-| **Login Password** | `demo12345` | Main shop session access (12h session) |
-| **Owner PIN** | `1234` | Required for destructive actions, cash reopening, reports, and editing delivered tickets |
+This creates a blank development database and opens the first-run setup page at **[http://127.0.0.1:8000](http://127.0.0.1:8000)**. Shop-owner setup does not use the development seed scripts.
 
 ---
 

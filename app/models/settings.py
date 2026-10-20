@@ -6,14 +6,13 @@ from app.db import Base
 from app.models.base import TimestampMixin
 
 DEFAULT_RECEIPT_TERMS = (
-    "1. Device is accepted at the owner's risk; please back up your data. "
-    "2. Estimates may change after diagnosis and your approval will be sought. "
-    "3. Repaired devices carry the warranty stated on this receipt for the repaired part/fault only; physical or water damage voids it. "
+    "1. Estimates may change after diagnosis and your approval will be sought. "
+    "2. Repaired devices carry the warranty stated on this receipt for the repaired part/fault only; physical or water damage voids it. "
     "4. Please present this receipt or ticket number at pickup."
 )
 
 DEFAULT_MSG_INTAKE = (
-    "Hi {name}, we received your {device}. Ticket {ticket_no}. Issue: {issue}. Advance paid: ₹{advance}. Thank you, {shop_name}."
+    "Hi {name}, we received your {device}. Ticket {ticket_no}. Issue: {issue}. Thank you, {shop_name}."
 )
 
 DEFAULT_MSG_READY = (
@@ -25,7 +24,7 @@ class Settings(Base, TimestampMixin):
     __tablename__ = "settings"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    shop_name: Mapped[str] = mapped_column(String(100), default="Mobile Repair Shop", nullable=False)
+    shop_name: Mapped[str] = mapped_column(String(100), default="AMEE MOBILES", nullable=False)
     shop_phone: Mapped[str] = mapped_column(String(30), default="", nullable=False)
     shop_address: Mapped[str] = mapped_column(Text, default="", nullable=False)
     receipt_terms_text: Mapped[str] = mapped_column(Text, default=DEFAULT_RECEIPT_TERMS, nullable=False)

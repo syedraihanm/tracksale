@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_db
 from app.deps import get_current_session, require_login, verify_csrf
-from app.formatting import parse_money
-from app.models.enums import ISSUE_CATEGORIES, PaymentMode
+from app.formatting import days_ago, parse_money
+from app.models.enums import ISSUE_CATEGORIES, PaymentMode, TicketStatus
 from app.models.settings import Settings as SettingsModel
 from app.models.ticket import Ticket
 from app.services.errors import (
@@ -128,6 +128,7 @@ async def ticket_create(
             advance_mode=advance_mode,
             advance_note=advance_note,
             parent_ticket_id=parent_ticket_id,
+            initial_status=TicketStatus.IN_PROGRESS.value,
         )
         db.commit()
     except DayClosed as e:
@@ -145,7 +146,7 @@ async def ticket_create(
             status_code=422,
         )
 
-    return RedirectResponse(url=f"/tickets/{ticket.id}/receipt", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url=f"/tickets/{ticket.id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/{id}", response_class=HTMLResponse)
@@ -208,28 +209,38 @@ def ticket_detail(request: Request, id: int, db: Session = Depends(get_db)):
     available_inventory = get_available_spares(db)
     active_suppliers = list_suppliers(db, active_only=True)
 
+    context_data = {
+        "session": session,
+        "shop_name": setting.shop_name if setting else "Mobile Repair Shop",
+        "ticket": ticket,
+        "age_days": days_ago(ticket.received_at),
+        "items_total": items_total,
+        "net_paid": net_paid,
+        "balance_due": balance_due,
+        "allowed_transitions": allowed_transitions,
+        "under_warranty": under_w,
+        "histories": histories,
+        "visible_items": visible_items,
+        "payments_list": payments_list,
+        "audits": audits,
+        "wa_intake_url": wa_intake,
+        "wa_ready_url": wa_ready,
+        "categories": ISSUE_CATEGORIES,
+        "available_inventory": available_inventory,
+        "suppliers": active_suppliers,
+    }
+
+    if request.headers.get("HX-Request") == "true" and request.query_params.get("drawer") == "1":
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/ticket_drawer.html",
+            context=context_data,
+        )
+
     return templates.TemplateResponse(
         request=request,
         name="tickets/detail.html",
-        context={
-            "session": session,
-            "shop_name": setting.shop_name if setting else "Mobile Repair Shop",
-            "ticket": ticket,
-            "items_total": items_total,
-            "net_paid": net_paid,
-            "balance_due": balance_due,
-            "allowed_transitions": allowed_transitions,
-            "under_warranty": under_w,
-            "histories": histories,
-            "visible_items": visible_items,
-            "payments_list": payments_list,
-            "audits": audits,
-            "wa_intake_url": wa_intake,
-            "wa_ready_url": wa_ready,
-            "categories": ISSUE_CATEGORIES,
-            "available_inventory": available_inventory,
-            "suppliers": active_suppliers,
-        },
+        context=context_data,
     )
 
 

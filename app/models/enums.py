@@ -86,3 +86,13 @@ ISSUE_CATEGORIES = [
     "Motherboard",
     "Other",
 ]
+
+
+ISSUE_CATEGORY_LABELS = {
+    "Screen": "Display",
+}
+
+
+def issue_category_label(category: str) -> str:
+    """Return the current UI label for a stored issue category value."""
+    return ISSUE_CATEGORY_LABELS.get(category, category)

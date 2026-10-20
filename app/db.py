@@ -2,6 +2,7 @@ from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
 
+from fastapi import Request
 from sqlalchemy import DateTime, TypeDecorator, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -72,9 +73,11 @@ SessionLocal = sessionmaker(
 )
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_db(request: Request) -> Generator[Session, None, None]:
     db = SessionLocal()
+    request.state.template_db_session = db
     try:
         yield db
     finally:
+        request.state.template_db_session = None
         db.close()

@@ -1,127 +1,126 @@
-<div class="space-y-6">
-    {% if total_count == 0 or (groups|map(attribute='count')|sum == 0) %}
-    <div class="bg-white rounded-xl border border-slate-200 p-12 text-center">
-        <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 022 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+<section class="queue-table-card bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" aria-label="Repair tickets">
+    {% if total_count == 0 %}
+    <div class="px-6 py-14 text-center">
+        {% if total_ticket_count == 0 %}
+        <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4" aria-hidden="true">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3.75h7.69a1.5 1.5 0 011.06.44l3.56 3.56a1.5 1.5 0 01.44 1.06v11.44a1.5 1.5 0 01-1.5 1.5h-11.25a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5zM15 3.75v4.5h4.5M9 13.5h6m-6 3h6" />
+            </svg>
         </div>
-        <h3 class="text-base font-semibold text-slate-800">No tickets in this status</h3>
-        <p class="text-xs text-slate-500 mt-1">Select other statuses from the filters above or create a new repair ticket.</p>
-        <a href="/tickets/new" class="mt-4 inline-flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg text-xs font-medium hover:bg-brand-700 transition">
-            Create First Ticket
+        <h2 class="text-base font-semibold text-slate-900">Create your first ticket</h2>
+        <p class="mt-1 text-sm text-slate-600">Add a customer and device to start tracking repairs in your queue.</p>
+        <a href="/tickets/new" class="mt-5 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5" /></svg>
+            Create your first ticket
         </a>
+        <p class="mt-3 text-xs text-slate-600">Quick start: press <kbd class="rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono text-[11px] text-slate-700">N</kbd></p>
+        {% else %}
+        <div class="w-11 h-11 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-3" aria-hidden="true">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012 2h2a2 2 0 012 2" />
+            </svg>
+        </div>
+        {% if queue_focus == 'balance_due' %}
+        <h2 class="text-sm font-semibold text-slate-900">No active tickets with a balance due</h2>
+        {% elif selected_statuses|length == 1 %}
+        <h2 class="text-sm font-semibold text-slate-900">No tickets in {{ status_display_names[selected_statuses[0]] }}</h2>
+        {% else %}
+        <h2 class="text-sm font-semibold text-slate-900">No tickets match these filters</h2>
+        {% endif %}
+        <p class="mt-1 text-xs text-slate-600">There are tickets in other parts of the queue.</p>
+        <a href="/" class="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">View all active</a>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200 bg-white">
+        <div>
+            <h2 class="text-sm font-semibold text-slate-900">Tickets</h2>
+            <p class="mt-0.5 text-xs text-slate-600">{{ total_count }} shown · sorted by urgency</p>
+        </div>
+        <span class="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-600">
+            <kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 font-mono text-[10px]">Enter</kbd>
+            opens ticket details
+        </span>
+    </div>
+
+    <div class="queue-table-scroll">
+        <table id="repair-queue-table" class="queue-table w-full table-fixed text-left text-sm text-slate-700">
+            <colgroup>
+                <col style="width: 10%">
+                <col style="width: 20%">
+                <col style="width: 17%">
+                <col style="width: 31%">
+                <col style="width: 22%">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th scope="col" data-sort-key="ticket"><button type="button" onclick="sortQueueTable('ticket')">Ticket #</button></th>
+                    <th scope="col" data-sort-key="customer"><button type="button" onclick="sortQueueTable('customer')">Customer</button></th>
+                    <th scope="col" data-sort-key="device"><button type="button" onclick="sortQueueTable('device')">Device / Model</button></th>
+                    <th scope="col" data-sort-key="issue"><button type="button" onclick="sortQueueTable('issue')">Issue</button></th>
+                    <th scope="col" data-sort-key="status"><button type="button" onclick="sortQueueTable('status')">Status</button></th>
+                </tr>
+            </thead>
+            <tbody id="repair-queue-rows">
+                {% for item in all_tickets %}
+                <tr class="queue-ticket-row {% if item.is_ready_stale_7d or item.is_approval_stale_2d %}queue-ticket-row-flagged{% endif %}"
+                    tabindex="0"
+                    role="button"
+                    aria-label="Open details for ticket {{ item.ticket.ticket_no }}"
+                    hx-get="/tickets/{{ item.ticket.id }}?drawer=1"
+                    hx-target="#ticket-drawer-panel"
+                    hx-swap="innerHTML"
+                    data-sort-ticket="{{ item.ticket.ticket_no|lower }}"
+                    data-sort-customer="{{ item.ticket.customer.name|lower }}"
+                    data-sort-device="{{ (item.ticket.device_brand ~ ' ' ~ item.ticket.device_model)|lower }}"
+                    data-sort-issue="{{ item.ticket.reported_issue|lower }}"
+                    data-sort-status="{{ status_display_names[item.ticket.status]|lower }}"
+                    onclick="openTicketDrawerFromRow(this)"
+                    onkeydown="if (event.target === this && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); this.click(); }">
+                    <td class="queue-cell queue-ticket-number">
+                        <span>{{ item.ticket.ticket_no }}</span>
+                    </td>
+                    <td class="queue-cell">
+                        <span class="queue-primary-text">{{ item.ticket.customer.name }}</span>
+                        <span class="queue-secondary-text">{{ item.ticket.customer.phone }}</span>
+                    </td>
+                    <td class="queue-cell">
+                        <span class="queue-primary-text">{{ item.ticket.device_brand }} {{ item.ticket.device_model }}</span>
+                        {% if item.ticket.color %}<span class="queue-secondary-text">{{ item.ticket.color }}</span>{% endif %}
+                    </td>
+                    <td class="queue-cell queue-issue-cell" title="{{ item.ticket.reported_issue }}">
+                        <span>{{ item.ticket.reported_issue }}</span>
+                    </td>
+                    <td class="queue-cell">
+                        <div class="queue-status-wrap">
+                            {% if item.allowed_transitions %}
+                            <select class="status-badge badge-{{ item.ticket.status }} queue-status-select"
+                                    aria-label="Change status for ticket {{ item.ticket.ticket_no }}"
+                                    data-ticket-id="{{ item.ticket.id }}"
+                                    data-ticket-no="{{ item.ticket.ticket_no }}"
+                                    data-csrf-token="{{ session.csrf_token }}"
+                                    data-balance-description="{% if item.balance_due > 0 %}unpaid balance of {{ item.balance_due|inr }}{% elif item.balance_due < 0 %}credit balance of {{ item.balance_due|abs|inr }}{% endif %}"
+                                    onchange="changeQueueTicketStatus(this)"
+                                    onclick="event.stopPropagation()"
+                                    onkeydown="event.stopPropagation()">
+                                <option value="" selected disabled>{{ status_display_names[item.ticket.status] }}</option>
+                                {% for next_status in item.allowed_transitions %}
+                                <option value="{{ next_status }}">Move to {{ next_status|replace('_', ' ')|title }}</option>
+                                {% endfor %}
+                            </select>
+                            <span class="queue-status-chevron" aria-hidden="true">⌄</span>
+                            {% else %}
+                            <span class="status-badge badge-{{ item.ticket.status }} queue-status-badge">
+                                <span class="w-1.5 h-1.5 rounded-full status-dot-{{ item.ticket.status }}"></span>
+                                {{ status_display_names[item.ticket.status] }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
     {% endif %}
-
-    {% for g in groups %}
-        {% if g.count > 0 %}
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <!-- Group Header -->
-            <button type="button"
-                    onclick="document.getElementById('group-body-{{ g.status }}').classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180')"
-                    class="w-full px-6 py-3.5 bg-slate-50 hover:bg-slate-100 flex items-center justify-between border-b border-slate-200 text-left transition">
-                <div class="flex items-center gap-3">
-                    <span class="w-3 h-3 rounded-full border badge-{{ g.status }}"></span>
-                    <span class="font-bold text-sm text-slate-800">{{ g.display_name }}</span>
-                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-600">
-                        {{ g.count }}
-                    </span>
-                </div>
-                <svg class="chevron w-4 h-4 text-slate-500 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </button>
-
-            <!-- Group Content -->
-            <div id="group-body-{{ g.status }}">
-                <!-- Desktop Table View (>= 768px) -->
-                <div class="hidden md:block overflow-x-auto">
-                    <table class="w-full text-left text-sm text-slate-600">
-                        <thead class="bg-white text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-100">
-                            <tr>
-                                <th class="px-6 py-2.5">Ticket</th>
-                                <th class="px-6 py-2.5">Customer</th>
-                                <th class="px-6 py-2.5">Device</th>
-                                <th class="px-6 py-2.5">Age</th>
-                                <th class="px-6 py-2.5">In Status</th>
-                                <th class="px-6 py-2.5 text-right">Balance Due</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            {% for item in g.tickets %}
-                            <tr class="transition hover:bg-slate-50/80 {% if item.is_stale_7d %}overdue-status-row{% endif %}">
-                                <td class="px-6 py-3.5 whitespace-nowrap font-mono font-bold text-brand-600">
-                                    <a href="/tickets/{{ item.ticket.id }}" class="hover:underline">
-                                        {{ item.ticket.ticket_no }}
-                                    </a>
-                                </td>
-                                <td class="px-6 py-3.5">
-                                    <a href="/customers/{{ item.ticket.customer_id }}" class="font-medium text-slate-900 hover:text-brand-600 block">
-                                        {{ item.ticket.customer.name }}
-                                    </a>
-                                    <span class="text-xs text-slate-400 font-mono">{{ item.ticket.customer.phone }}</span>
-                                </td>
-                                <td class="px-6 py-3.5">
-                                    <span class="font-medium text-slate-800">{{ item.ticket.device_brand }} {{ item.ticket.device_model }}</span>
-                                    <span class="block text-xs text-slate-400 truncate max-w-xs">{{ item.ticket.reported_issue }}</span>
-                                </td>
-                                <td class="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">
-                                    {{ item.age_days }}d
-                                </td>
-                                <td class="px-6 py-3.5 whitespace-nowrap text-xs">
-                                    <div class="flex items-center gap-1.5">
-                                        <span>{{ item.in_status_days }}d</span>
-                                        {% if item.is_stale_7d %}
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
-                                            7d+
-                                        </span>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                                <td class="px-6 py-3.5 whitespace-nowrap text-right font-mono font-semibold">
-                                    {% if item.balance_due < 0 %}
-                                    <span class="text-emerald-600">Credit {{ item.balance_due|abs|inr }}</span>
-                                    {% elif item.balance_due > 0 %}
-                                    <span class="text-slate-800">{{ item.balance_due|inr }}</span>
-                                    {% else %}
-                                    <span class="text-slate-400">₹0</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Mobile Cards View (< 768px) -->
-                <div class="md:hidden divide-y divide-slate-100">
-                    {% for item in g.tickets %}
-                    <a href="/tickets/{{ item.ticket.id }}"
-                       class="block p-4 transition hover:bg-slate-50 {% if item.is_stale_7d %}overdue-status-row{% endif %}">
-                        <div class="flex items-center justify-between text-xs mb-1">
-                            <span class="font-mono font-bold text-brand-600">{{ item.ticket.ticket_no }}</span>
-                            <div class="flex items-center gap-1 text-[11px] text-slate-500">
-                                <span>Age: {{ item.age_days }}d</span>
-                                <span>•</span>
-                                <span>In status: {{ item.in_status_days }}d</span>
-                                {% if item.is_stale_7d %}
-                                <span class="px-1 py-0.2 bg-amber-200 text-amber-900 rounded font-bold text-[9px]">7d+</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="font-medium text-slate-900 text-sm">
-                            {{ item.ticket.device_brand }} {{ item.ticket.device_model }}
-                        </div>
-                        <div class="flex items-center justify-between mt-2 text-xs">
-                            <span class="text-slate-600">{{ item.ticket.customer.name }} ({{ item.ticket.customer.phone }})</span>
-                            <span class="font-mono font-bold {% if item.balance_due < 0 %}text-emerald-600{% elif item.balance_due > 0 %}text-slate-800{% else %}text-slate-400{% endif %}">
-                                {% if item.balance_due < 0 %}Credit {{ item.balance_due|abs|inr }}{% else %}{{ item.balance_due|inr }}{% endif %}
-                            </span>
-                        </div>
-                    </a>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-    {% endfor %}
-</div>
+</section>

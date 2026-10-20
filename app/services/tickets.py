@@ -92,6 +92,7 @@ def create_ticket(
     advance_note: str | None = None,
     parent_ticket_id: int | None = None,
     now: datetime | None = None,
+    initial_status: str = TicketStatus.RECEIVED.value,
 ) -> Ticket:
     """Create a new ticket and optional advance payment atomically."""
     current_time = now or utc_now()
@@ -146,7 +147,7 @@ def create_ticket(
         issue_category=issue_category,
         intake_condition=condition,
         estimate_amount=estimate_amount if (estimate_amount and estimate_amount >= 0) else None,
-        status=TicketStatus.RECEIVED.value,
+        status=initial_status,
         warranty_days=default_warranty,
         parent_ticket_id=parent_ticket_id,
         received_at=current_time,
@@ -159,9 +160,13 @@ def create_ticket(
     history = StatusHistory(
         ticket_id=ticket.id,
         from_status=None,
-        to_status=TicketStatus.RECEIVED.value,
+        to_status=initial_status,
         changed_at=current_time,
-        note="Ticket created at intake",
+        note=(
+            "Ticket created at intake"
+            if initial_status == TicketStatus.RECEIVED.value
+            else "Ticket created in progress"
+        ),
     )
     db.add(history)
 

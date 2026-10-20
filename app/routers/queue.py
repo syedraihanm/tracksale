@@ -2,8 +2,8 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy import desc, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import desc, func, or_
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db import get_db
 from app.deps import get_current_session, require_login
@@ -13,19 +13,27 @@ from app.models.settings import Settings as SettingsModel
 from app.models.ticket import Ticket
 from app.services.payments import get_ticket_totals
 from app.services.receipts import generate_whatsapp_url
+from app.services.status import get_allowed_transitions
 from app.templating import templates
-from app.timeutil import (
-    utc_now,
-)
+from app.timeutil import utc_now
 
 router = APIRouter(dependencies=[Depends(require_login)])
 
-STATUS_ORDER = [
+ACTIVE_STATUSES = [
     TicketStatus.RECEIVED.value,
     TicketStatus.AWAITING_APPROVAL.value,
     TicketStatus.IN_PROGRESS.value,
     TicketStatus.AWAITING_PARTS.value,
     TicketStatus.READY_FOR_PICKUP.value,
+]
+
+CLOSED_STATUSES = [
+    TicketStatus.DELIVERED.value,
+    TicketStatus.DECLINED.value,
+    TicketStatus.UNREPAIRABLE.value,
+]
+
+STATUS_ORDER = ACTIVE_STATUSES + [
     TicketStatus.DECLINED.value,
     TicketStatus.UNREPAIRABLE.value,
     TicketStatus.DELIVERED.value,
@@ -37,9 +45,9 @@ STATUS_DISPLAY_NAMES = {
     TicketStatus.IN_PROGRESS.value: "In Progress",
     TicketStatus.AWAITING_PARTS.value: "Awaiting Parts",
     TicketStatus.READY_FOR_PICKUP.value: "Ready for Pickup",
-    TicketStatus.DECLINED.value: "Declined (To Hand Back)",
-    TicketStatus.UNREPAIRABLE.value: "Unrepairable (To Hand Back)",
     TicketStatus.DELIVERED.value: "Delivered (Last 30 Days)",
+    TicketStatus.DECLINED.value: "Declined",
+    TicketStatus.UNREPAIRABLE.value: "Unrepairable",
 }
 
 
@@ -48,6 +56,7 @@ STATUS_DISPLAY_NAMES = {
 def queue_view(
     request: Request,
     status: list[str] = Query(default=[]),
+    queue_focus: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
     """Grouped table ticket queue view."""
@@ -55,14 +64,79 @@ def queue_view(
     setting = db.query(SettingsModel).filter_by(id=1).first()
 
     now = utc_now()
-    active_defaults = [s for s in STATUS_ORDER if s != TicketStatus.DELIVERED.value]
+    thirty_days_ago = now - timedelta(days=30)
+
+    # Compute live counts for all statuses
+    counts_query = (
+        db.query(Ticket.status, func.count(Ticket.id))
+        .filter(Ticket.is_deleted.is_(False))
+        .group_by(Ticket.status)
+        .all()
+    )
+    total_ticket_count = sum(count for _, count in counts_query)
+    status_counts = {s: 0 for s in STATUS_ORDER}
+    for st, cnt in counts_query:
+        if st in status_counts:
+            status_counts[st] = cnt
+
+    # Restrict delivered count to last 30 days
+    delivered_count = (
+        db.query(func.count(Ticket.id))
+        .filter(
+            Ticket.is_deleted.is_(False),
+            Ticket.status == TicketStatus.DELIVERED.value,
+            or_(
+                Ticket.delivered_at >= thirty_days_ago,
+                Ticket.delivered_at.is_(None),
+            ),
+        )
+        .scalar()
+    ) or 0
+    status_counts[TicketStatus.DELIVERED.value] = delivered_count
+    all_active_count = sum(status_counts.get(s, 0) for s in ACTIVE_STATUSES)
+    queue_focus = queue_focus if queue_focus == "balance_due" else ""
+
+    # Today's strip uses the same active queue data and shop timezone as the rest of the app.
+    active_tickets = (
+        db.query(Ticket)
+        .options(
+            selectinload(Ticket.items),
+            selectinload(Ticket.payments),
+            selectinload(Ticket.status_histories),
+        )
+        .filter(Ticket.is_deleted.is_(False), Ticket.status.in_(ACTIVE_STATUSES))
+        .all()
+    )
+    ready_tickets = [ticket for ticket in active_tickets if ticket.status == TicketStatus.READY_FOR_PICKUP.value]
+    ready_oldest_days = max(
+        (
+            days_ago(
+                max(
+                    (history.changed_at for history in ticket.status_histories if history.to_status == ticket.status),
+                    default=ticket.ready_at or ticket.received_at,
+                ),
+                now_dt=now,
+            )
+            for ticket in ready_tickets
+        ),
+        default=0,
+    )
+    balance_to_collect = 0
+    for ticket in active_tickets:
+        items_total = sum(item.price_charged for item in ticket.items if not item.is_deleted)
+        net_paid = sum(payment.amount for payment in ticket.payments if not payment.is_deleted)
+        balance_to_collect += max(items_total - net_paid, 0)
 
     # Check whether the request has explicit filter parameters
     is_filtering = "status" in request.query_params or "filtered" in request.query_params
     if is_filtering:
         selected_statuses = [s for s in status if s in STATUS_ORDER]
+        is_all_active = not queue_focus and set(selected_statuses) == set(ACTIVE_STATUSES)
     else:
-        selected_statuses = active_defaults
+        selected_statuses = ACTIVE_STATUSES.copy()
+        is_all_active = not queue_focus
+
+    is_filtered_custom = not is_all_active
 
     # Query active tickets
     query = (
@@ -94,13 +168,16 @@ def queue_view(
         query = query.filter(Ticket.status.in_(selected_statuses))
         tickets = query.order_by(desc(Ticket.received_at)).all()
 
-    # Group tickets by status order
+    # Group tickets by status order and build flat enriched list
     grouped: dict[str, list[dict]] = {s: [] for s in STATUS_ORDER if s in selected_statuses}
+    all_tickets_list: list[dict] = []
 
     for t in tickets:
         if t.status not in grouped:
             continue
         items_total, net_paid, balance_due = get_ticket_totals(t)
+        if queue_focus == "balance_due" and balance_due <= 0:
+            continue
         age_days = days_ago(t.received_at, now_dt=now)
 
         # In status days from latest status history
@@ -108,7 +185,31 @@ def queue_view(
         latest_hist = max(histories, key=lambda h: h.changed_at) if histories else None
         in_status_days = days_ago(latest_hist.changed_at if latest_hist else t.received_at, now_dt=now)
 
-        grouped[t.status].append({
+        # Warning badges
+        is_ready_stale_7d = in_status_days > 7 and t.status == TicketStatus.READY_FOR_PICKUP.value
+        is_approval_stale_2d = in_status_days > 2 and t.status == TicketStatus.AWAITING_APPROVAL.value
+
+        # Urgency scoring for default sorting
+        if is_ready_stale_7d:
+            urgency_score = (0, -in_status_days)
+        elif is_approval_stale_2d:
+            urgency_score = (1, -in_status_days)
+        elif t.status == TicketStatus.READY_FOR_PICKUP.value:
+            urgency_score = (2, -in_status_days)
+        elif t.status == TicketStatus.AWAITING_APPROVAL.value:
+            urgency_score = (3, -in_status_days)
+        elif t.status == TicketStatus.IN_PROGRESS.value:
+            urgency_score = (4, -age_days)
+        elif t.status == TicketStatus.AWAITING_PARTS.value:
+            urgency_score = (5, -in_status_days)
+        elif t.status == TicketStatus.RECEIVED.value:
+            urgency_score = (6, -age_days)
+        elif t.status in (TicketStatus.DECLINED.value, TicketStatus.UNREPAIRABLE.value):
+            urgency_score = (7, -in_status_days)
+        else:
+            urgency_score = (8, -age_days)
+
+        item_data = {
             "ticket": t,
             "items_total": items_total,
             "net_paid": net_paid,
@@ -116,7 +217,17 @@ def queue_view(
             "age_days": age_days,
             "in_status_days": in_status_days,
             "is_stale_7d": in_status_days > 7 and t.status != TicketStatus.DELIVERED.value,
-        })
+            "is_ready_stale_7d": is_ready_stale_7d,
+            "is_approval_stale_2d": is_approval_stale_2d,
+            "urgency_score": urgency_score,
+            "allowed_transitions": get_allowed_transitions(t.status),
+        }
+
+        grouped[t.status].append(item_data)
+        all_tickets_list.append(item_data)
+
+    # Sort all_tickets by urgency by default
+    all_tickets_list.sort(key=lambda x: x["urgency_score"])
 
     # Prepare group cards in standard order
     groups_data = []
@@ -137,10 +248,28 @@ def queue_view(
         "session": session,
         "shop_name": setting.shop_name if setting else "Mobile Repair Shop",
         "groups": groups_data,
+        "all_tickets": all_tickets_list,
         "total_count": total_count,
+        "total_ticket_count": total_ticket_count,
         "all_statuses": STATUS_ORDER,
+        "active_statuses": ACTIVE_STATUSES,
+        "closed_statuses": CLOSED_STATUSES,
         "status_display_names": STATUS_DISPLAY_NAMES,
         "selected_statuses": selected_statuses,
+        "status_counts": status_counts,
+        "all_active_count": all_active_count,
+        "is_all_active": is_all_active,
+        "is_filtered_custom": is_filtered_custom,
+        "queue_focus": queue_focus,
+        "today_metrics": {
+            "in_progress": status_counts.get(TicketStatus.IN_PROGRESS.value, 0),
+            "ready_for_pickup": len(ready_tickets),
+            "ready_oldest_days": ready_oldest_days,
+            "balance_to_collect": balance_to_collect,
+        },
+        "today_focus_in_progress": not queue_focus and selected_statuses == [TicketStatus.IN_PROGRESS.value],
+        "today_focus_ready": not queue_focus and selected_statuses == [TicketStatus.READY_FOR_PICKUP.value],
+        "today_focus_balance": queue_focus == "balance_due",
     }
 
     if request.headers.get("HX-Request") == "true":

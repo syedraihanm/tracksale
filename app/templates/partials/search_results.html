@@ -1,4 +1,10 @@
 <div class="py-1 divide-y divide-slate-100">
+    {% if not results %}
+    <div class="px-4 py-4" role="status" aria-live="polite">
+        <p class="text-sm font-semibold text-slate-800">No match for “{{ query }}”</p>
+        <p class="mt-2 text-xs leading-5 text-slate-600">Check the phone digits, or try searching by the IMEI.</p>
+    </div>
+    {% endif %}
     {% for r in results %}
     <a href="/tickets/{{ r.ticket.id }}"
        class="search-result-item block px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer {% if loop.first %}bg-slate-50{% endif %}"

@@ -41,4 +41,5 @@ def create_warranty_return(
         color=parent_ticket.color,
         parent_ticket_id=parent_ticket.id,
         now=now,
+        initial_status=TicketStatus.IN_PROGRESS.value,
     )

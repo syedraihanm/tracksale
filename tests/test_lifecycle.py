@@ -8,7 +8,7 @@ from app.services.items import add_item
 from app.services.payments import add_payment
 from app.services.status import VALID_TRANSITIONS, transition_ticket
 from app.services.tickets import create_ticket
-from app.timeutil import utc_now
+from app.timeutil import business_date, utc_now
 
 
 def test_transition_matrix(temp_db):
@@ -85,7 +85,7 @@ def test_outcome_and_warranty_on_delivery(temp_db):
     transition_ticket(temp_db, t_rep, TicketStatus.DELIVERED.value, now=now)
 
     assert t_rep.outcome == Outcome.REPAIRED.value
-    assert t_rep.warranty_until == now.date() + timedelta(days=t_rep.warranty_days)
+    assert t_rep.warranty_until == business_date(now) + timedelta(days=t_rep.warranty_days)
 
     # 2. Unrepairable ticket
     t_unrep = create_ticket(

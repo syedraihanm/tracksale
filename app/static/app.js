@@ -47,6 +47,47 @@
     initFormDoubleSubmitProtection();
     enhanceModernUI(document);
 
+    const queuedStatusToast = sessionStorage.getItem("repairQueueStatusToast");
+    if (queuedStatusToast) {
+      sessionStorage.removeItem("repairQueueStatusToast");
+      showToast(queuedStatusToast, "success");
+    }
+
+    const savedQueueFilter = sessionStorage.getItem("repairQueueFilterState");
+    if (savedQueueFilter) {
+      sessionStorage.removeItem("repairQueueFilterState");
+      const filterForm = document.getElementById("queue-filter-form");
+      try {
+        const state = JSON.parse(savedQueueFilter);
+        if (filterForm && Array.isArray(state.statuses)) {
+          filterForm.querySelectorAll('input[name="status"]').forEach((input) => {
+            input.checked = state.statuses.includes(input.value);
+          });
+          const focus = filterForm.querySelector("#queue-focus");
+          if (focus) focus.value = typeof state.focus === "string" ? state.focus : "";
+          if (typeof window.updateToolbarState === "function") window.updateToolbarState();
+          document.querySelectorAll(".today-stat-card").forEach((card) => {
+            const active = Boolean(state.focus) && card.dataset.todayFocus === state.focus;
+            card.classList.toggle("today-stat-card-active", active);
+            card.setAttribute("aria-pressed", active ? "true" : "false");
+          });
+          if (window.htmx) window.htmx.trigger(filterForm, "change");
+        }
+      } catch (error) {
+        // Ignore stale or malformed saved filter state and keep the default queue view.
+      }
+    }
+
+    const reopenDrawerTicket = sessionStorage.getItem("repairQueueOpenDrawer");
+    const drawerPanel = document.getElementById("ticket-drawer-panel");
+    if (reopenDrawerTicket && drawerPanel && window.htmx) {
+      sessionStorage.removeItem("repairQueueOpenDrawer");
+      window.htmx.ajax("GET", `/tickets/${reopenDrawerTicket}?drawer=1`, {
+        target: "#ticket-drawer-panel",
+        swap: "innerHTML",
+      });
+    }
+
     // Re-apply modern UI enhancements whenever HTMX swaps any partial
     document.body.addEventListener("htmx:afterSwap", function (e) {
       enhanceModernUI(e.target || document);
@@ -231,6 +272,18 @@
       }
 
       if (e.key === "Escape") {
+        const openDialog = document.querySelector("dialog[open]");
+        if (openDialog) {
+          openDialog.close();
+          return;
+        }
+
+        const visibleModal = document.querySelector('[id$="-modal"].fixed:not(.hidden)');
+        if (visibleModal) {
+          visibleModal.classList.add("hidden");
+          return;
+        }
+
         resultsBox.innerHTML = "";
         closeMobileSidebar();
       }

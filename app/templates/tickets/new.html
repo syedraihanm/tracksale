@@ -145,7 +145,7 @@
                                 name="issue_category"
                                 class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm text-sm focus:ring-brand-500 focus:border-brand-500 bg-white">
                             {% for cat in categories %}
-                            <option value="{{ cat }}" {% if cat == 'Other' %}selected{% endif %}>{{ cat }}</option>
+                            <option value="{{ cat }}" {% if cat == 'Other' %}selected{% endif %}>{{ cat|issue_category_label }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -265,7 +265,7 @@
                 <button type="submit"
                         id="submit-intake-btn"
                         class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg text-sm shadow transition flex items-center gap-2">
-                    <span>Create Ticket & Show Receipt</span>
+                    <span>Create Ticket</span>
                 </button>
             </div>
         </form>

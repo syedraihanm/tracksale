@@ -8,44 +8,26 @@ This guide explains how the system runs completely offline on the shop PC with a
 
 1. **Silent Background Server Launcher (`start_app_silent.vbs` + `run_server.bat`):**
    - Starts Uvicorn on `http://127.0.0.1:8000` silently with **no black command prompt window**.
-2. **Auto-Start on Boot:**
-   - Configured in Windows Startup (`shell:startup`). Whenever this computer turns on or logs in, the backend server starts silently in the background.
+2. **Auto-Start on Login:**
+   - Configured in Windows Startup (`shell:startup`). The backend server starts silently when the shop user signs in to Windows.
 3. **One-Click Desktop POS App (`Amee Mobiles POS` on your Desktop):**
    - An icon with your emblem logo on the Desktop.
-   - Double-clicking it checks if the server is running (starts it if needed), and opens Google Chrome or Microsoft Edge in **frameless standalone app mode** (`--app=http://localhost:8000`).
+   - Double-clicking it checks the server's health, starts it if needed, waits until it is ready, and opens Google Chrome or Microsoft Edge in **frameless standalone app mode** (`--app=http://127.0.0.1:8000`).
    - Feels like a native Windows desktop software without address bar or browser clutter.
 
 ---
 
-## 2. Steps to Set Up on a Different / New PC
+## 2. Set Up on a Different / New PC
 
-When moving or installing this project onto another Windows PC:
+Copy the `service` project folder to the new PC. Do not copy `.venv` or `.git`; the installer rebuilds the Python environment. For a fresh shop, also leave out `.env`, `data\shop.db`, and `backups\` so setup creates fresh secrets and an empty database.
 
-### Step 1: Install Python & uv
-1. Install **Python 3.12+** from [python.org](https://www.python.org/downloads/) (make sure to check **"Add python.exe to PATH"** during installation).
-2. Open PowerShell or Command Prompt and install `uv` (fast package manager):
-   ```powershell
-   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-   ```
+The new PC needs an internet connection for the first setup. Double-click **`setup_shop_pc.bat`**. It installs `uv`, uses an existing Python 3.12 or installs a managed one, installs the locked app dependencies, creates a local `.env` with unique secrets if one is missing, applies database migrations, and creates the Desktop app shortcut plus the Windows sign-in startup link.
 
-### Step 2: Copy the Project Folder
-- Copy the entire `service` folder (via USB drive or `git clone https://github.com/syedraihanm/tracksale.git`) onto the new PC (e.g. `C:\AmeeMobiles\service` or Desktop).
+The installer does not seed sample tickets, import data, or erase an existing database. A fresh database opens the first-run setup screen with **AMEE MOBILES** prefilled so the owner can set a password and PIN.
 
-### Step 3: Install Dependencies & Run Database Migration
-Open Command Prompt in that folder and run:
-```cmd
-uv sync
-uv run alembic upgrade head
-```
+After setup, double-click **`Amee Mobiles POS`** on the Desktop. It starts the local server if needed, waits for its health check, then opens the shop app in Chrome or Edge app mode. Diagnostics are saved under `%LOCALAPPDATA%\AmeeMobiles\logs`.
 
-### Step 4: Configure Auto-Start & Desktop Icon (One-Click)
-1. Double-click **`install_autostart.bat`**:
-   - This places a silent startup link in Windows Startup so the server starts when the PC powers on.
-2. Run this command in the project folder to create the Desktop icon:
-   ```cmd
-   uv run python -c "import os, subprocess; subprocess.run(['cmd', '/c', 'launch_pos_app.bat'])"
-   ```
-   Or simply right-click **`launch_pos_app.bat`** -> **Send to** -> **Desktop (create shortcut)**, rename it to `Amee Mobiles POS`, and assign the icon from `app\static\app.ico`.
+The shortcut stores the project folder path. If you move the folder later, run `setup_shop_pc.bat` again to rebuild the shortcuts.
 
 ---
 

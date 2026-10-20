@@ -1,16 +1,47 @@
-target/
+# Python environments and build output
 .venv/
+venv/
+env/
+ENV/
+target/
+dist/
+build/
+*.egg-info/
+
+# Python bytecode and tooling caches
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
 .pytest_cache/
+.ruff_cache/
+.tox/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
-data/
-backups/
-*.db
-*.db-wal
-*.db-shm
+
+# Per-computer secrets; keep the documented template in Git
 .env
+.env.*
+!.env.example
+
+# Local shop database and backups (created by setup/app on the shop PC)
+/data/
+/backups/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+
+# Local logs and editor files
+logs/
+*.log
+.vs/
+.idea/
+.claude/
+/step1_filter_bar_review.md
+
+# OS metadata
 .DS_Store
+Thumbs.db
+Desktop.ini

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.deps import get_current_session, require_login, require_pin_unlock
+from app.models.enums import issue_category_label
 from app.models.settings import Settings as SettingsModel
 from app.services.reports import (
     compute_comparison_pct,
@@ -92,7 +93,7 @@ def dashboard_view(
         "brands_values": [b[1] for b in rep["top_brands"]],
         "models_labels": [m[0] for m in rep["top_models"]],
         "models_values": [m[1] for m in rep["top_models"]],
-        "issues_labels": [i[0] for i in rep["top_issues"]],
+        "issues_labels": [issue_category_label(i[0]) for i in rep["top_issues"]],
         "issues_values": [i[1] for i in rep["top_issues"]],
         "variance_labels": [v["date"] for v in rep["variance_history"]],
         "variance_values": [v["variance"] for v in rep["variance_history"]],
@@ -162,7 +163,7 @@ def export_table_csv(
     elif table_name == "issues":
         writer.writerow(["Issue Category", "Repairs Received"])
         for issue, count in rep["top_issues"]:
-            writer.writerow([issue, count])
+            writer.writerow([issue_category_label(issue), count])
 
     else:
         raise HTTPException(status_code=404, detail="Unknown export table")

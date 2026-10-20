@@ -19,7 +19,11 @@ def search_dropdown(request: Request, q: str = Query("", max_length=100), db: Se
 
     results = search_tickets(db, query, limit=20)
     if not results:
-        return HTMLResponse('<div class="p-4 text-xs text-slate-500 text-center">No matching tickets found.</div>')
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/search_results.html",
+            context={"results": [], "query": query},
+        )
 
     enriched = []
     for t in results:

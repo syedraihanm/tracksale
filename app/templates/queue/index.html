@@ -1,98 +1,333 @@
 {% extends "base.html" %}
 
-{% block title %}Ticket Queue{% endblock %}
+{% block title %}Repair Queue - {{ shop_name }}{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <!-- Top Action & Filter Bar -->
-    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="space-y-4">
+    <!-- Top Action & Overview Bar -->
+    <div class="bg-white px-5 py-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-            <h1 class="text-xl font-bold text-slate-800">Repair Queue</h1>
-            <p class="text-xs text-slate-500">Live active repair status tracking</p>
+            <div class="flex items-center gap-2.5">
+                <h1 class="text-xl font-bold tracking-tight text-slate-900">Repair Queue</h1>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                    {{ all_active_count }} Active Repairs
+                </span>
+            </div>
+            <p class="text-xs text-slate-600 mt-0.5">High-speed counter queue & status workflow management</p>
         </div>
 
-        <!-- Filter Chips Form -->
+        <div class="flex items-center gap-2">
+            <a href="/tickets/new"
+               id="btn-new-ticket"
+               title="Keyboard shortcut: Press 'N' anywhere to intake a new repair ticket"
+               class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-semibold shadow-sm transition inline-flex items-center gap-2 shrink-0 group focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1">
+                <svg class="w-4 h-4 transition group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
+                </svg>
+                <span>New Repair Ticket</span>
+                <kbd class="hidden sm:inline-block ml-0.5 px-1.5 py-0.5 text-[10px] font-mono font-bold bg-brand-700/60 text-brand-100 rounded border border-brand-500/40">N</kbd>
+            </a>
+        </div>
+    </div>
+
+    <!-- Segmented Status Filter Bar -->
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <form id="queue-filter-form"
               hx-get="/"
               hx-target="#queue-container"
+              hx-indicator="#queue-loading"
               hx-trigger="change"
               hx-push-url="true"
-              class="flex flex-wrap items-center gap-1.5 text-xs">
+              class="flex flex-col gap-2.5">
             <input type="hidden" name="filtered" value="1">
-            {% for s in all_statuses %}
-            <label class="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition select-none
-                          {% if s in selected_statuses %}bg-slate-800 text-white border-slate-800 shadow-sm{% else %}bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100{% endif %}"
-                   title="Click to toggle, double-click to view only this status"
-                   ondblclick="selectOnlyThis(this)">
-                <input type="checkbox"
-                       name="status"
-                       value="{{ s }}"
-                       onchange="toggleChip(this)"
-                       {% if s in selected_statuses %}checked{% endif %}
-                       class="sr-only">
-                <span>{{ status_display_names[s] }}</span>
-            </label>
-            {% endfor %}
-            <div class="flex items-center gap-1 ml-1 border-l border-slate-200 pl-2">
-                <button type="button"
-                        onclick="selectAllActive()"
-                        class="px-2 py-0.5 text-[11px] font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition"
-                        title="Reset to all active repair statuses">
-                    All Active
-                </button>
-                <button type="button"
-                        onclick="clearAllStatuses()"
-                        class="px-2 py-0.5 text-[11px] font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition"
-                        title="Deselect all statuses">
-                    Clear
-                </button>
+            <input type="hidden" name="queue_focus" id="queue-focus" value="{{ queue_focus }}">
+
+            <div class="flex items-center justify-between flex-wrap gap-2.5">
+                <!-- Primary Active Work Group -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <!-- All Active Pill -->
+                    <button type="button"
+                            id="pill-all-active"
+                            onclick="selectAllActive()"
+                            class="filter-pill {% if is_all_active %}filter-pill-active-all_active{% else %}filter-pill-inactive{% endif %}"
+                            title="Reset to all active repair tickets in the shop">
+                        <span>All Active</span>
+                        <span class="pill-count px-1.5 py-0.5 rounded-full text-[11px] font-bold">{{ all_active_count }}</span>
+                    </button>
+
+                    <div class="h-5 w-px bg-slate-200 mx-1 hidden md:block"></div>
+
+                    <!-- Active Status Pills -->
+                    {% for s in active_statuses %}
+                    <label class="filter-pill {% if s in selected_statuses and not is_all_active %}filter-pill-active-{{ s }}{% else %}filter-pill-inactive{% endif %}"
+                           data-status="{{ s }}"
+                           title="Click to filter, double-click to view only {{ status_display_names[s] }}"
+                           onclick="handlePillClick(event, this)"
+                           ondblclick="selectOnlyThis(this)">
+                        <input type="checkbox"
+                               name="status"
+                               value="{{ s }}"
+                               {% if s in selected_statuses %}checked{% endif %}
+                               onchange="onCheckboxChanged(this)"
+                               class="sr-only">
+                        <span class="w-2 h-2 rounded-full status-dot-{{ s }}"></span>
+                        <span>{{ status_display_names[s] }}</span>
+                        <span class="pill-count px-1.5 py-0.5 rounded-full text-[11px] font-bold">{{ status_counts[s] }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <!-- Secondary Closed Group (Delivered last 30d, Declined, Unrepairable) -->
+                <div class="flex items-center gap-1.5 flex-wrap pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 lg:border-l lg:border-slate-200 lg:pl-3 w-full lg:w-auto">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-600 select-none mr-0.5">Closed:</span>
+
+                    {% for s in closed_statuses %}
+                    <label class="filter-pill {% if s in selected_statuses %}filter-pill-active-{{ s }}{% else %}filter-pill-inactive{% endif %}"
+                           data-status="{{ s }}"
+                           title="Click to view {{ status_display_names[s] }}"
+                           onclick="handlePillClick(event, this)"
+                           ondblclick="selectOnlyThis(this)">
+                        <input type="checkbox"
+                               name="status"
+                               value="{{ s }}"
+                               {% if s in selected_statuses %}checked{% endif %}
+                               onchange="onCheckboxChanged(this)"
+                               class="sr-only">
+                        <span class="w-2 h-2 rounded-full status-dot-{{ s }}"></span>
+                        <span>{{ status_display_names[s] }}</span>
+                        <span class="pill-count px-1.5 py-0.5 rounded-full text-[11px] font-bold">{{ status_counts[s] }}</span>
+                    </label>
+                    {% endfor %}
+
+                    <!-- Clear Button (visible only when custom filter is applied) -->
+                    <button type="button"
+                            id="btn-clear-filters"
+                            onclick="clearAllStatuses()"
+                            style="display: {% if is_filtered_custom %}inline-flex{% else %}none{% endif %};"
+                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition ml-1"
+                            title="Clear all filters and view empty filter state">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        <span>Clear</span>
+                    </button>
+                </div>
             </div>
         </form>
+    </div>
 
-        <a href="/tickets/new"
-           class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center gap-1.5 shrink-0">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-            Intake New Ticket
-        </a>
+    <!-- Today action strip -->
+    <section class="today-strip grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3" aria-label="Today's queue priorities">
+        <button type="button"
+                class="today-stat-card {% if today_focus_in_progress %}today-stat-card-active{% endif %}"
+                data-today-focus="in_progress"
+                onclick="applyTodayFilter('in_progress')"
+                aria-pressed="{{ 'true' if today_focus_in_progress else 'false' }}">
+            <span class="today-stat-icon today-stat-icon-indigo" aria-hidden="true">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8.25v3.75l2.25 1.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </span>
+            <span class="today-stat-copy">
+                <span class="today-stat-label">In Progress</span>
+                <strong>{{ today_metrics.in_progress }}</strong>
+            </span>
+            <span class="today-stat-hint">Repairs being worked on</span>
+        </button>
+
+        <button type="button"
+                class="today-stat-card {% if today_focus_ready %}today-stat-card-active{% endif %}"
+                data-today-focus="ready_for_pickup"
+                onclick="applyTodayFilter('ready_for_pickup')"
+                aria-pressed="{{ 'true' if today_focus_ready else 'false' }}">
+            <span class="today-stat-icon today-stat-icon-green" aria-hidden="true">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </span>
+            <span class="today-stat-copy">
+                <span class="today-stat-label">Ready for pickup</span>
+                <strong>{{ today_metrics.ready_for_pickup }}</strong>
+            </span>
+            <span class="today-stat-hint">Oldest: {{ today_metrics.ready_oldest_days }} days</span>
+        </button>
+
+        <button type="button"
+                class="today-stat-card {% if today_focus_balance %}today-stat-card-active{% endif %}"
+                data-today-focus="balance_due"
+                onclick="applyTodayFilter('balance_due')"
+                aria-pressed="{{ 'true' if today_focus_balance else 'false' }}">
+            <span class="today-stat-icon today-stat-icon-indigo" aria-hidden="true">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M5.25 15h2.25m4.5 0h2.25m-12-9h19.5a1.5 1.5 0 011.5 1.5v9a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5v-9a1.5 1.5 0 011.5-1.5z" /></svg>
+            </span>
+            <span class="today-stat-copy">
+                <span class="today-stat-label">Balance to collect</span>
+                <strong>{{ today_metrics.balance_to_collect|inr }}</strong>
+            </span>
+            <span class="today-stat-hint">Across active tickets</span>
+        </button>
+    </section>
+
+    <div id="queue-loading" class="htmx-indicator queue-loading" role="status" aria-label="Loading repair tickets" aria-live="polite">
+        <span></span><span></span><span></span>
     </div>
 
     <!-- Queue Container (swapped by HTMX filter changes) -->
     <div id="queue-container">
         {% include "partials/queue_table.html" %}
     </div>
+    <div id="ticket-drawer-panel"></div>
 </div>
 
 <script>
-function toggleChip(input) {
-    const label = input.closest('label');
+const ACTIVE_STATUS_LIST = ['received', 'awaiting_approval', 'in_progress', 'awaiting_parts', 'ready_for_pickup'];
+
+function updatePillVisual(label, isFilled) {
     if (!label) return;
-    if (input.checked) {
-        label.classList.remove('bg-slate-50', 'text-slate-600', 'border-slate-200', 'hover:bg-slate-100');
-        label.classList.add('bg-slate-800', 'text-white', 'border-slate-800', 'shadow-sm');
+    const status = label.getAttribute('data-status');
+    const activeClass = 'filter-pill-active-' + status;
+
+    if (isFilled) {
+        label.classList.remove('filter-pill-inactive');
+        label.classList.add(activeClass);
     } else {
-        label.classList.remove('bg-slate-800', 'text-white', 'border-slate-800', 'shadow-sm');
-        label.classList.add('bg-slate-50', 'text-slate-600', 'border-slate-200', 'hover:bg-slate-100');
+        label.classList.remove(activeClass);
+        label.classList.add('filter-pill-inactive');
     }
 }
 
-function selectAllActive() {
-    const activeDefaults = ['received', 'awaiting_approval', 'in_progress', 'awaiting_parts', 'ready_for_pickup', 'declined', 'unrepairable'];
+function updateToolbarState() {
     const form = document.getElementById('queue-filter-form');
     if (!form) return;
-    form.querySelectorAll('input[name="status"]').forEach(input => {
-        input.checked = activeDefaults.includes(input.value);
-        toggleChip(input);
+    const allActivePill = document.getElementById('pill-all-active');
+    const clearBtn = document.getElementById('btn-clear-filters');
+
+    const checkedInputs = Array.from(form.querySelectorAll('input[name="status"]:checked'));
+    const checkedValues = checkedInputs.map(i => i.value);
+
+    const isAllActive = checkedValues.length === ACTIVE_STATUS_LIST.length &&
+        ACTIVE_STATUS_LIST.every(s => checkedValues.includes(s));
+
+    if (isAllActive) {
+        if (allActivePill) {
+            allActivePill.className = 'filter-pill filter-pill-active-all_active';
+        }
+        if (clearBtn) {
+            clearBtn.style.display = 'none';
+        }
+        // When All Active is active, individual active pills show clean light outline
+        form.querySelectorAll('label[data-status]').forEach(label => {
+            const status = label.getAttribute('data-status');
+            if (ACTIVE_STATUS_LIST.includes(status)) {
+                updatePillVisual(label, false);
+            }
+        });
+    } else {
+        if (allActivePill) {
+            allActivePill.className = 'filter-pill filter-pill-inactive';
+        }
+        if (clearBtn) {
+            clearBtn.style.display = 'inline-flex';
+        }
+        form.querySelectorAll('label[data-status]').forEach(label => {
+            const input = label.querySelector('input[name="status"]');
+            updatePillVisual(label, input ? input.checked : false);
+        });
+    }
+}
+
+function onCheckboxChanged(input) {
+    clearQueueFocus();
+    updateToolbarState();
+}
+
+function clearQueueFocus() {
+    const focusInput = document.getElementById('queue-focus');
+    if (focusInput) focusInput.value = '';
+    document.querySelectorAll('.today-stat-card').forEach(card => {
+        card.classList.remove('today-stat-card-active');
+        card.setAttribute('aria-pressed', 'false');
     });
+}
+
+function applyTodayFilter(focus) {
+    const form = document.getElementById('queue-filter-form');
+    if (!form) return;
+
+    const statusByFocus = {
+        in_progress: ['in_progress'],
+        ready_for_pickup: ['ready_for_pickup'],
+        balance_due: ACTIVE_STATUS_LIST,
+    };
+    const selected = statusByFocus[focus] || ACTIVE_STATUS_LIST;
+    form.querySelectorAll('input[name="status"]').forEach(input => {
+        input.checked = selected.includes(input.value);
+    });
+
+    const focusInput = document.getElementById('queue-focus');
+    if (focusInput) focusInput.value = focus === 'balance_due' ? focus : '';
+
+    document.querySelectorAll('.today-stat-card').forEach(card => {
+        const isActive = card.dataset.todayFocus === focus;
+        card.classList.toggle('today-stat-card-active', isActive);
+        card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+
+    updateToolbarState();
+    htmx.trigger(form, 'change');
+}
+
+function handlePillClick(event, label) {
+    if (event.target.tagName.toLowerCase() === 'input') return;
+    event.preventDefault();
+
+    const input = label.querySelector('input[name="status"]');
+    if (!input) return;
+
+    clearQueueFocus();
+
+    const form = document.getElementById('queue-filter-form');
+    const checkedInputs = Array.from(form.querySelectorAll('input[name="status"]:checked'));
+    const checkedValues = checkedInputs.map(i => i.value);
+
+    const isAllActiveCurrently = checkedValues.length === ACTIVE_STATUS_LIST.length &&
+        ACTIVE_STATUS_LIST.every(s => checkedValues.includes(s));
+
+    if (isAllActiveCurrently) {
+        // Isolate to clicked status for immediate fast counter access
+        form.querySelectorAll('input[name="status"]').forEach(i => {
+            i.checked = (i === input);
+        });
+    } else {
+        // Toggle the clicked status
+        input.checked = !input.checked;
+    }
+
+    updateToolbarState();
+    htmx.trigger(form, 'change');
+}
+
+function selectAllActive() {
+    const form = document.getElementById('queue-filter-form');
+    if (!form) return;
+
+    clearQueueFocus();
+
+    form.querySelectorAll('input[name="status"]').forEach(input => {
+        input.checked = ACTIVE_STATUS_LIST.includes(input.value);
+    });
+
+    updateToolbarState();
     htmx.trigger(form, 'change');
 }
 
 function clearAllStatuses() {
     const form = document.getElementById('queue-filter-form');
     if (!form) return;
+
+    clearQueueFocus();
+
     form.querySelectorAll('input[name="status"]').forEach(input => {
         input.checked = false;
-        toggleChip(input);
     });
+
+    updateToolbarState();
     htmx.trigger(form, 'change');
 }
 
@@ -101,11 +336,227 @@ function selectOnlyThis(label) {
     if (!input) return;
     const form = document.getElementById('queue-filter-form');
     if (!form) return;
+
+    clearQueueFocus();
+
     form.querySelectorAll('input[name="status"]').forEach(inp => {
         inp.checked = (inp === input);
-        toggleChip(inp);
     });
+
+    updateToolbarState();
     htmx.trigger(form, 'change');
 }
+
+let lastDrawerTrigger = null;
+
+function openTicketDrawerFromRow(row) {
+    lastDrawerTrigger = row;
+    document.querySelectorAll('.queue-ticket-row.is-opening').forEach(item => item.classList.remove('is-opening'));
+    row.classList.add('is-opening');
+}
+
+function closeTicketDrawer() {
+    const panel = document.getElementById('ticket-drawer-panel');
+    if (panel) panel.innerHTML = '';
+    if (lastDrawerTrigger) {
+        lastDrawerTrigger.classList.remove('is-opening');
+        lastDrawerTrigger.focus();
+    }
+}
+
+function openDrawerPaymentForm() {
+    const form = document.getElementById('drawer-payment-form');
+    if (!form) return;
+    form.classList.remove('hidden');
+    const trigger = document.querySelector('.drawer-payment-button');
+    if (trigger) trigger.hidden = true;
+    form.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    form.querySelector('[name="amount"]')?.focus({preventScroll: true});
+}
+
+function closeDrawerPaymentForm() {
+    const form = document.getElementById('drawer-payment-form');
+    if (!form) return;
+    form.reset();
+    form.classList.add('hidden');
+    const trigger = document.querySelector('.drawer-payment-button');
+    if (trigger) trigger.hidden = false;
+    const note = form.querySelector('[name="note"]');
+    if (note) note.required = false;
+    const error = document.getElementById('drawer-payment-error');
+    if (error) {
+        error.textContent = '';
+        error.classList.add('hidden');
+    }
+}
+
+function updateDrawerPaymentRequirements(select) {
+    const note = select.form?.querySelector('[name="note"]');
+    if (note) note.required = select.value === 'refund';
+}
+
+async function recordDrawerPayment(event, form) {
+    event.preventDefault();
+    const submit = form.querySelector('[type="submit"]');
+    const errorBox = form.querySelector('[role="alert"]');
+    const ticketId = form.dataset.ticketId;
+    const ticketNo = form.dataset.ticketNo;
+    if (submit) {
+        submit.disabled = true;
+        submit.textContent = 'Saving…';
+    }
+    errorBox?.classList.add('hidden');
+    if (errorBox) errorBox.textContent = '';
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            credentials: 'same-origin',
+            headers: {'HX-Request': 'true'}
+        });
+        if (response.ok && response.redirected && new URL(response.url).pathname === `/tickets/${ticketId}`) {
+            const filterForm = document.getElementById('queue-filter-form');
+            if (filterForm) {
+                sessionStorage.setItem('repairQueueFilterState', JSON.stringify({
+                    statuses: Array.from(filterForm.querySelectorAll('input[name="status"]:checked')).map(input => input.value),
+                    focus: filterForm.querySelector('#queue-focus')?.value || ''
+                }));
+            }
+            sessionStorage.setItem('repairQueueOpenDrawer', ticketId);
+            sessionStorage.setItem('repairQueueStatusToast', `Payment recorded for ${ticketNo}.`);
+            window.location.reload();
+            return;
+        }
+
+        const responseText = await response.text();
+        const responseDocument = new DOMParser().parseFromString(responseText, 'text/html');
+        const message = (responseDocument.body.textContent || '').trim() || 'Could not record the payment. Please try again.';
+        if (errorBox) {
+            errorBox.textContent = message;
+            errorBox.classList.remove('hidden');
+        }
+    } catch (error) {
+        if (errorBox) {
+            errorBox.textContent = 'Could not record the payment. Check the connection and try again.';
+            errorBox.classList.remove('hidden');
+        }
+    } finally {
+        if (submit && document.body.contains(submit)) {
+            submit.disabled = false;
+            submit.textContent = 'Record payment';
+        }
+    }
+}
+
+async function changeQueueTicketStatus(select) {
+    const nextStatus = select.value;
+    const ticketId = select.dataset.ticketId;
+    const ticketNo = select.dataset.ticketNo;
+    if (!nextStatus || !ticketId) return;
+
+    const isClosedStatus = ['declined', 'unrepairable', 'delivered'].includes(nextStatus);
+    const balanceDescription = select.dataset.balanceDescription;
+    const confirmPendingBalance = nextStatus === 'delivered' && Boolean(balanceDescription);
+    const balanceText = confirmPendingBalance ? ` with ${balanceDescription}` : '';
+    if (isClosedStatus && !window.confirm(`Mark ${ticketNo} as ${nextStatus.replaceAll('_', ' ')}${balanceText}?`)) {
+        select.value = '';
+        return;
+    }
+
+    const postStatus = async (confirmPendingBalance = false) => {
+        const formData = new FormData();
+        formData.append('csrf_token', select.dataset.csrfToken || '');
+        formData.append('to_status', nextStatus);
+        if (confirmPendingBalance) formData.append('confirm_pending_balance', '1');
+        return fetch(`/tickets/${ticketId}/status`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+    };
+
+    select.disabled = true;
+    try {
+        let response = await postStatus(confirmPendingBalance);
+        if (response.status === 409 && nextStatus === 'delivered' && !confirmPendingBalance) {
+            const confirmBalance = window.confirm('This ticket has an unpaid or credit balance. Confirm delivery with the balance outstanding?');
+            if (!confirmBalance) {
+                select.disabled = false;
+                select.value = '';
+                return;
+            }
+            response = await postStatus(true);
+        }
+        if (!response.ok || !response.redirected || !response.url.includes(`/tickets/${ticketId}`)) {
+            throw new Error('The status could not be changed. Please try again.');
+        }
+        sessionStorage.setItem('repairQueueStatusToast', `${ticketNo} moved to ${nextStatus.replaceAll('_', ' ')}.`);
+        window.location.reload();
+    } catch (error) {
+        select.disabled = false;
+        select.value = '';
+        document.body.dispatchEvent(new CustomEvent('toast', {detail: {message: error.message, type: 'error'}}));
+    }
+}
+
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    if (event.detail.target && event.detail.target.id === 'ticket-drawer-panel') {
+        const closeButton = document.querySelector('.ticket-drawer-close');
+        if (closeButton) closeButton.focus();
+    }
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape' && document.getElementById('ticket-drawer-layer')) {
+        closeTicketDrawer();
+    }
+});
+
+function sortQueueTable(key) {
+    const table = document.getElementById('repair-queue-table');
+    const body = document.getElementById('repair-queue-rows');
+    if (!table || !body) return;
+
+    const previousKey = table.dataset.sortKey;
+    const previousDirection = table.dataset.sortDirection;
+    const direction = previousKey === key && previousDirection === 'asc' ? 'desc' : 'asc';
+    const dataKey = 'sort' + key.charAt(0).toUpperCase() + key.slice(1);
+    const numericKeys = new Set(['days', 'balance']);
+    const rows = Array.from(body.querySelectorAll('tr'));
+
+    rows.sort((leftRow, rightRow) => {
+        const leftValue = leftRow.dataset[dataKey] || '';
+        const rightValue = rightRow.dataset[dataKey] || '';
+        const comparison = numericKeys.has(key)
+            ? Number(leftValue) - Number(rightValue)
+            : leftValue.localeCompare(rightValue, undefined, {numeric: true, sensitivity: 'base'});
+        return direction === 'asc' ? comparison : -comparison;
+    });
+
+    rows.forEach(row => body.appendChild(row));
+    table.dataset.sortKey = key;
+    table.dataset.sortDirection = direction;
+    table.querySelectorAll('thead th').forEach(header => {
+        const isActive = header.dataset.sortKey === key;
+        header.setAttribute('aria-sort', isActive ? (direction === 'asc' ? 'ascending' : 'descending') : 'none');
+        header.querySelector('button')?.classList.toggle('is-sorted', isActive);
+    });
+}
+
+// Global Keyboard Shortcut: Press 'N' to intake new ticket
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'n' || e.key === 'N') {
+        const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+        if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select' || document.activeElement.isContentEditable) {
+            return;
+        }
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-new-ticket');
+            if (btn) btn.click();
+        }
+    }
+});
 </script>
 {% endblock %}

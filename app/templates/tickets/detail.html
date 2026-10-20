@@ -165,7 +165,7 @@
                     </div>
 
                     <div class="pt-2 border-t border-slate-100">
-                        <span class="text-xs text-slate-400 block uppercase">Reported Issue ({{ ticket.issue_category }})</span>
+                        <span class="text-xs text-slate-400 block uppercase">Reported Issue ({{ ticket.issue_category|issue_category_label }})</span>
                         <p class="mt-1 font-medium text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-100">
                             {{ ticket.reported_issue }}
                         </p>
@@ -236,7 +236,7 @@
                         <label class="block text-xs font-medium text-slate-700">Issue Category</label>
                         <select name="issue_category" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs">
                             {% for cat in categories %}
-                            <option value="{{ cat }}" {% if cat == ticket.issue_category %}selected{% endif %}>{{ cat }}</option>
+                            <option value="{{ cat }}" {% if cat == ticket.issue_category %}selected{% endif %}>{{ cat|issue_category_label }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -262,7 +262,7 @@
             </div>
 
             <!-- Line Items Card -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+            <div id="ticket-line-items" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <h2 class="text-base font-bold text-slate-800">Repair Line Items</h2>
                     <span class="text-xs font-mono font-bold text-slate-600">Total Charged: {{ items_total|inr }}</span>

@@ -83,7 +83,7 @@
             <div>
                 <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Issue / Problem</span>
                 <div class="bg-slate-50 p-2.5 rounded border border-slate-100 mt-1 space-y-1">
-                    <span class="font-bold text-slate-900 text-sm block">{{ ticket.issue_category }}</span>
+                    <span class="font-bold text-slate-900 text-sm block">{{ ticket.issue_category|issue_category_label }}</span>
                     {% if ticket.reported_issue and ticket.reported_issue != ticket.issue_category %}
                     <p class="font-medium text-slate-600 text-xs">{{ ticket.reported_issue }}</p>
                     {% endif %}
