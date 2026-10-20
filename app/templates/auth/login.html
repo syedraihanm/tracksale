@@ -12,7 +12,7 @@
                 </svg>
             </div>
             <h1 class="text-xl font-bold text-slate-800">{{ shop_name|default("Repair Shop") }}</h1>
-            <p class="text-xs text-slate-500 mt-1">Enter your password to sign in</p>
+            <p class="text-xs text-slate-500 mt-1">Enter your Shop PIN to sign in</p>
         </div>
 
         {% if error %}
@@ -25,12 +25,15 @@
             <input type="hidden" name="next" value="{{ next_url|default('/') }}">
 
             <div>
-                <label for="password" class="block text-sm font-medium text-slate-700">Password</label>
+                <label for="pin" class="block text-sm font-medium text-slate-700">Shop PIN</label>
                 <input type="password"
-                       id="password"
-                       name="password"
+                       id="pin"
+                       name="pin"
                        required
                        autofocus
+                       inputmode="numeric"
+                       autocomplete="current-password"
+                       placeholder="Example: 1234"
                        class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 text-sm">
             </div>
 

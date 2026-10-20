@@ -56,7 +56,7 @@ def decrypt_passcode(cipher: str | None) -> str | None:
 
 # Rate Limiting
 class RateLimiter:
-    """In-memory rate limiter: 5 failures in 5 min -> 5 min lockout."""
+    """In-memory limiter for sensitive Owner PIN actions."""
     def __init__(self, max_attempts: int = 5, window_seconds: int = 300, lockout_seconds: int = 300):
         self.max_attempts = max_attempts
         self.window_seconds = window_seconds
@@ -119,7 +119,6 @@ class RateLimiter:
         self.lockouts.pop(key, None)
 
 
-login_limiter = RateLimiter(max_attempts=5, window_seconds=300, lockout_seconds=300)
 pin_limiter = RateLimiter(max_attempts=5, window_seconds=300, lockout_seconds=300)
 
 

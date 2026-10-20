@@ -8,7 +8,7 @@ A high-performance, local-first management system designed for Indian mobile rep
 
 Get the project folder from GitHub, then double-click **`setup_shop_pc.bat`**. The setup installs the required runtime and dependencies, prepares an empty database, and creates the Desktop shortcut **Amee Mobiles POS** plus a Windows sign-in startup shortcut. It does not seed sample tickets or import shop data.
 
-Double-click **Amee Mobiles POS** and complete the first-run password and Owner PIN setup. The shop name is prefilled as **AMEE MOBILES**. The receipt terms and WhatsApp intake message are also preconfigured.
+Double-click **Amee Mobiles POS** and complete the first-run setup. Choose one 4–6 digit Shop PIN (for example, `1234`); it is used for both sign-in and owner authorization. The shop name is prefilled as **AMEE MOBILES**. The receipt terms and WhatsApp intake message are also preconfigured.
 
 For transfer details and fresh-install file exclusions, see [LOCAL_SETUP_GUIDE.md](LOCAL_SETUP_GUIDE.md). Local databases, backups, and `.env` secrets are intentionally excluded from Git.
 

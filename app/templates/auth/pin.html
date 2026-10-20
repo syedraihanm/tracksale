@@ -12,7 +12,7 @@
                 </svg>
             </div>
             <h1 class="text-xl font-bold text-slate-800">Owner Authorization</h1>
-            <p class="text-xs text-slate-500 mt-1">Enter your Owner PIN to continue</p>
+            <p class="text-xs text-slate-500 mt-1">Enter your Shop PIN to continue</p>
         </div>
 
         {% if error %}
@@ -26,7 +26,7 @@
             <input type="hidden" name="next" value="{{ next_url|default('/') }}">
 
             <div>
-                <label for="pin" class="block text-sm font-medium text-slate-700">Owner PIN</label>
+                <label for="pin" class="block text-sm font-medium text-slate-700">Shop PIN</label>
                 <input type="password"
                        id="pin"
                        name="pin"
@@ -35,7 +35,7 @@
                        pattern="[0-9]{4,6}"
                        inputmode="numeric"
                        maxlength="6"
-                       placeholder="4-6 digits"
+                       placeholder="Example: 1234"
                        class="mt-1 block w-full px-3 py-2 text-center text-lg tracking-widest border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500">
             </div>
 

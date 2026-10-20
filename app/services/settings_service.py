@@ -122,35 +122,7 @@ def update_receipt_and_templates(
     return setting
 
 
-def change_password(
-    db: Session,
-    current_password: str,
-    new_password: str,
-    now: datetime | None = None,
-) -> None:
-    current_time = now or utc_now()
-    setting = get_settings_model(db)
-
-    if not setting.admin_password_hash or not verify_secret(setting.admin_password_hash, current_password):
-        raise ValidationFailed("Current password is incorrect")
-
-    if len(new_password) < 8:
-        raise ValidationFailed("New password must be at least 8 characters")
-
-    setting.admin_password_hash = hash_secret(new_password)
-    setting.updated_at = current_time
-    record_audit(
-        db=db,
-        entity="settings",
-        entity_id=1,
-        action="update",
-        changed_fields={"password": {"changed": True}},
-        reason="Admin password changed",
-        now=current_time,
-    )
-
-
-def change_owner_pin(
+def change_shop_pin(
     db: Session,
     current_pin: str,
     new_pin: str,
@@ -159,21 +131,49 @@ def change_owner_pin(
     current_time = now or utc_now()
     setting = get_settings_model(db)
 
-    if not setting.owner_pin_hash or not verify_secret(setting.owner_pin_hash, current_pin.strip()):
-        raise PinRequired("Current Owner PIN is incorrect")
+    current_pin = current_pin.strip()
+    matches_admin = verify_secret(setting.admin_password_hash, current_pin)
+    matches_owner = verify_secret(setting.owner_pin_hash, current_pin)
+    if not (matches_admin or matches_owner):
+        raise PinRequired("Current Shop PIN is incorrect")
 
     clean_new = new_pin.strip()
     if not (clean_new.isdigit() and 4 <= len(clean_new) <= 6):
-        raise ValidationFailed("New PIN must be 4 to 6 numeric digits")
+        raise ValidationFailed("New Shop PIN must be 4 to 6 numeric digits")
 
-    setting.owner_pin_hash = hash_secret(clean_new)
+    shared_pin_hash = hash_secret(clean_new)
+    setting.admin_password_hash = shared_pin_hash
+    setting.owner_pin_hash = shared_pin_hash
     setting.updated_at = current_time
     record_audit(
         db=db,
         entity="settings",
         entity_id=1,
         action="update",
-        changed_fields={"owner_pin": {"changed": True}},
-        reason="Owner PIN changed",
+        changed_fields={"shop_pin": {"changed": True}},
+        reason="Shop PIN changed",
         now=current_time,
     )
+
+
+def change_password(
+    db: Session,
+    current_password: str,
+    new_password: str,
+    now: datetime | None = None,
+) -> None:
+    """Compatibility wrapper; password changes now update the shared Shop PIN."""
+    try:
+        change_shop_pin(db, current_pin=current_password, new_pin=new_password, now=now)
+    except PinRequired as exc:
+        raise ValidationFailed("Current Shop PIN is incorrect") from exc
+
+
+def change_owner_pin(
+    db: Session,
+    current_pin: str,
+    new_pin: str,
+    now: datetime | None = None,
+) -> None:
+    """Compatibility wrapper that keeps both legacy credential hashes in sync."""
+    change_shop_pin(db, current_pin=current_pin, new_pin=new_pin, now=now)

@@ -137,49 +137,26 @@
         </form>
     </div>
 
-    <!-- Section 4: Security (Password & PIN) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Change Password -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-            <h2 class="text-base font-bold text-slate-800 pb-2 border-b border-slate-100">Change Admin Password</h2>
-            <form method="POST" action="/settings/password" class="space-y-3 text-xs">
-                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
-                <div>
-                    <label class="block font-medium text-slate-700">Current Password</label>
-                    <input type="password" name="current_password" required class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg">
-                </div>
-                <div>
-                    <label class="block font-medium text-slate-700">New Password (min 8 chars)</label>
-                    <input type="password" name="new_password" required minlength="8" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg">
-                </div>
-                <div class="flex justify-end pt-1">
-                    <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg transition">
-                        Update Password
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Change Owner PIN -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-            <h2 class="text-base font-bold text-slate-800 pb-2 border-b border-slate-100">Change Owner PIN</h2>
-            <form method="POST" action="/settings/pin" class="space-y-3 text-xs">
-                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
-                <div>
-                    <label class="block font-medium text-slate-700">Current Owner PIN</label>
-                    <input type="password" name="current_pin" required class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg font-mono">
-                </div>
-                <div>
-                    <label class="block font-medium text-slate-700">New Owner PIN (4-6 digits)</label>
-                    <input type="password" name="new_pin" required pattern="[0-9]{4,6}" maxlength="6" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg font-mono">
-                </div>
-                <div class="flex justify-end pt-1">
-                    <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg transition">
-                        Update Owner PIN
-                    </button>
-                </div>
-            </form>
-        </div>
+    <!-- Section 4: Security -->
+    <div class="bg-white max-w-2xl rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+        <h2 class="text-base font-bold text-slate-800 pb-2 border-b border-slate-100">Change Shop PIN</h2>
+        <p class="text-xs text-slate-500">One PIN is used for sign-in and owner authorization.</p>
+        <form method="POST" action="/settings/pin" class="space-y-3 text-xs">
+            <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+            <div>
+                <label class="block font-medium text-slate-700">Current Shop PIN</label>
+                <input type="password" name="current_pin" required inputmode="numeric" placeholder="Example: 1234" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg font-mono">
+            </div>
+            <div>
+                <label class="block font-medium text-slate-700">New Shop PIN (4–6 digits)</label>
+                <input type="password" name="new_pin" required pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" placeholder="Example: 1234" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg font-mono">
+            </div>
+            <div class="flex justify-end pt-1">
+                <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg transition">
+                    Update Shop PIN
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}

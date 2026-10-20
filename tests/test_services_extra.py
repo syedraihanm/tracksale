@@ -4,7 +4,7 @@ import pytest
 
 from app.models.enums import PaymentKind, TicketStatus
 from app.models.settings import Settings as SettingsModel
-from app.security import hash_secret
+from app.security import hash_secret, verify_secret
 from app.services.customers import get_customer_summary, update_customer_notes
 from app.services.errors import PinRequired, ValidationFailed
 from app.services.items import add_item, delete_item, edit_item
@@ -146,13 +146,14 @@ def test_settings_service_updates_and_security(temp_db):
     change_owner_pin(temp_db, current_pin="1234", new_pin="5678")
     temp_db.commit()
 
-    # Change admin password with wrong current password
+    # Changing the Shop PIN accepts either former credential, and updates both.
     with pytest.raises(ValidationFailed):
-        change_password(temp_db, current_password="wrong", new_password="newpassword123")
+        change_password(temp_db, current_password="wrong", new_password="9876")
 
-    # Change admin password with valid current password
-    change_password(temp_db, current_password="oldpass123", new_password="newpassword123")
+    change_password(temp_db, current_password="5678", new_password="9876")
     temp_db.commit()
+    assert verify_secret(settings.admin_password_hash, "9876")
+    assert verify_secret(settings.owner_pin_hash, "9876")
 
 
 def test_item_delivered_pin_protection_and_delete(temp_db):

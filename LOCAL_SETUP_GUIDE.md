@@ -23,7 +23,7 @@ Copy the `service` project folder to the new PC. Do not copy `.venv` or `.git`; 
 
 The new PC needs an internet connection for the first setup. Double-click **`setup_shop_pc.bat`**. It installs `uv`, uses an existing Python 3.12 or installs a managed one, installs the locked app dependencies, creates a local `.env` with unique secrets if one is missing, applies database migrations, and creates the Desktop app shortcut plus the Windows sign-in startup link.
 
-The installer does not seed sample tickets, import data, or erase an existing database. A fresh database opens the first-run setup screen with **AMEE MOBILES** prefilled so the owner can set a password and PIN.
+The installer does not seed sample tickets, import data, or erase an existing database. A fresh database opens the first-run setup screen with **AMEE MOBILES** prefilled so the owner can set one 4–6 digit Shop PIN for sign-in and owner authorization (for example, `1234`).
 
 After setup, double-click **`Amee Mobiles POS`** on the Desktop. It starts the local server if needed, waits for its health check, then opens the shop app in Chrome or Edge app mode. Diagnostics are saved under `%LOCALAPPDATA%\AmeeMobiles\logs`.
 
