@@ -61,7 +61,7 @@
                         <th class="px-6 py-3">Received</th>
                         <th class="px-6 py-3">Status</th>
                         <th class="px-6 py-3">Warranty</th>
-                        <th class="px-6 py-3 text-right">Billed</th>
+                        <th class="px-6 py-3 text-right">Customer Total</th>
                         <th class="px-6 py-3 text-right">Paid</th>
                         <th class="px-6 py-3 text-right">Balance</th>
                     </tr>
@@ -96,10 +96,12 @@
                             <span class="text-slate-400">-</span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 text-right font-mono">{{ item.items_total|inr }}</td>
+                        <td class="px-6 py-4 text-right font-mono">{% if item.customer_total_set %}{{ item.customer_total|inr }}{% else %}Not set{% endif %}</td>
                         <td class="px-6 py-4 text-right font-mono text-emerald-600">{{ item.net_paid|inr }}</td>
                         <td class="px-6 py-4 text-right font-mono font-semibold {% if item.balance_due > 0 %}text-amber-600{% elif item.balance_due < 0 %}text-emerald-600{% else %}text-slate-600{% endif %}">
-                            {% if item.balance_due < 0 %}
+                            {% if not item.customer_total_set %}
+                            Not set
+                            {% elif item.balance_due < 0 %}
                             Credit {{ item.balance_due|abs|inr }}
                             {% else %}
                             {{ item.balance_due|inr }}

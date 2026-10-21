@@ -120,7 +120,7 @@ def add_item(
         action="create",
         changed_fields={
             "description": {"old": None, "new": description},
-            "price_charged": {"old": None, "new": price_charged},
+            "cost_price": {"old": None, "new": cost_price},
             "type": {"old": None, "new": item_type},
         },
         now=current_time,

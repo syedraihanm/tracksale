@@ -123,9 +123,8 @@ def queue_view(
     )
     balance_to_collect = 0
     for ticket in active_tickets:
-        items_total = sum(item.price_charged for item in ticket.items if not item.is_deleted)
-        net_paid = sum(payment.amount for payment in ticket.payments if not payment.is_deleted)
-        balance_to_collect += max(items_total - net_paid, 0)
+        _, _, balance_due = get_ticket_totals(ticket)
+        balance_to_collect += max(balance_due, 0)
 
     # Check whether the request has explicit filter parameters
     is_filtering = "status" in request.query_params or "filtered" in request.query_params
@@ -175,7 +174,7 @@ def queue_view(
     for t in tickets:
         if t.status not in grouped:
             continue
-        items_total, net_paid, balance_due = get_ticket_totals(t)
+        customer_total, net_paid, balance_due = get_ticket_totals(t)
         if queue_focus == "balance_due" and balance_due <= 0:
             continue
         age_days = days_ago(t.received_at, now_dt=now)
@@ -211,7 +210,9 @@ def queue_view(
 
         item_data = {
             "ticket": t,
-            "items_total": items_total,
+            "items_total": customer_total,
+            "customer_total": customer_total,
+            "customer_total_set": customer_total > 0,
             "net_paid": net_paid,
             "balance_due": balance_due,
             "age_days": age_days,
@@ -301,7 +302,7 @@ def ready_list(request: Request, db: Session = Depends(get_db)):
 
     enriched = []
     for t in tickets:
-        _, _, balance_due = get_ticket_totals(t)
+        customer_total, _, balance_due = get_ticket_totals(t)
         waiting_days = days_ago(t.ready_at or t.received_at, now_dt=now)
         wa_url = generate_whatsapp_url(
             ticket=t,
@@ -312,6 +313,7 @@ def ready_list(request: Request, db: Session = Depends(get_db)):
             "ticket": t,
             "waiting_days": waiting_days,
             "balance_due": balance_due,
+            "customer_total_set": customer_total > 0,
             "whatsapp_url": wa_url,
         })
 

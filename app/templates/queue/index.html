@@ -175,6 +175,50 @@
     <div id="ticket-drawer-panel"></div>
 </div>
 
+<dialog id="queue-delivery-dialog" class="p-0 rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full bg-white backdrop:bg-slate-950/40">
+    <form id="queue-delivery-form" method="POST" class="p-6 space-y-4" onsubmit="submitQueueDelivery(event, this)">
+        <input type="hidden" name="csrf_token" value="">
+        <input type="hidden" name="to_status" value="delivered">
+        <h2 class="text-lg font-bold text-slate-900">Deliver <span id="queue-delivery-ticket-no" class="font-mono"></span></h2>
+        <p id="queue-delivery-description" class="text-sm text-slate-600">Record a customer payment here if one is collected now, or deliver without recording a payment.</p>
+
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg space-y-3">
+            <div class="flex items-center justify-between text-xs">
+                <span id="queue-delivery-balance-label" class="text-emerald-900">Balance due</span>
+                <strong id="queue-delivery-balance" class="font-mono text-emerald-900"></strong>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <label class="text-[11px] font-semibold text-slate-700">Amount collected ₹
+                    <input id="queue-delivery-amount" type="number" name="delivery_payment_amount" min="1" step="1" oninput="updateQueueDeliveryConfirmation(this)" placeholder="Optional" class="mt-1 w-full px-2.5 py-2 border border-slate-300 rounded-lg bg-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </label>
+                <label class="text-[11px] font-semibold text-slate-700">Payment method
+                    <select name="delivery_payment_mode" class="mt-1 w-full px-2.5 py-2 border border-slate-300 rounded-lg bg-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="cash">Cash</option>
+                        <option value="upi">UPI</option>
+                        <option value="card">Card</option>
+                    </select>
+                </label>
+            </div>
+            <label class="block text-[11px] font-medium text-slate-700">Payment note (optional)
+                <input type="text" name="delivery_payment_note" maxlength="500" placeholder="UPI reference or note" class="mt-1 w-full px-2.5 py-2 border border-slate-300 rounded-lg bg-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </label>
+        </div>
+
+        <div id="queue-delivery-remaining-confirmation" class="hidden p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
+            <label class="flex items-center gap-2 font-semibold cursor-pointer">
+                <input type="checkbox" name="confirm_pending_balance" value="1" class="rounded text-brand-600">
+                <span id="queue-delivery-confirmation-label">Deliver with the remaining balance unpaid</span>
+            </label>
+        </div>
+
+        <div id="queue-delivery-error" class="hidden rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800" role="alert"></div>
+        <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeQueueDeliveryDialog()" class="px-4 py-2 text-xs text-slate-600 hover:text-slate-900">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold transition">Record Payment & Deliver</button>
+        </div>
+    </form>
+</dialog>
+
 <script>
 const ACTIVE_STATUS_LIST = ['received', 'awaiting_approval', 'in_progress', 'awaiting_parts', 'ready_for_pickup'];
 
@@ -449,11 +493,172 @@ async function recordDrawerPayment(event, form) {
     }
 }
 
+let activeQueueDeliverySelect = null;
+
+document.getElementById('queue-delivery-dialog')?.addEventListener('close', function() {
+    if (activeQueueDeliverySelect) {
+        activeQueueDeliverySelect.disabled = false;
+        activeQueueDeliverySelect.value = '';
+        activeQueueDeliverySelect = null;
+    }
+});
+
+function updateQueueDeliveryConfirmation(input) {
+    const form = input.form;
+    const balanceDue = Number(form?.dataset.balanceDue || 0);
+    const amountCollected = Number(input.value || 0);
+    const confirmation = document.getElementById('queue-delivery-remaining-confirmation');
+    const checkbox = confirmation?.querySelector('input[name="confirm_pending_balance"]');
+    if (!confirmation || !checkbox) return;
+
+    const needsPendingBalanceConfirmation = balanceDue > 0 && amountCollected < balanceDue;
+    const customerTotalSet = form?.dataset.customerTotalSet === '1';
+    const needsCreditConfirmation = customerTotalSet && (balanceDue < 0 || (balanceDue === 0 && amountCollected > 0));
+    const needsConfirmation = needsPendingBalanceConfirmation || needsCreditConfirmation;
+    confirmation.classList.toggle('hidden', !needsConfirmation);
+    checkbox.required = needsConfirmation;
+    if (!needsConfirmation) checkbox.checked = false;
+    const confirmationLabel = document.getElementById('queue-delivery-confirmation-label');
+    if (confirmationLabel) {
+        confirmationLabel.textContent = needsCreditConfirmation
+            ? 'Confirm delivery with the customer credit balance'
+            : 'Deliver with the remaining balance unpaid';
+    }
+
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) {
+        submit.textContent = amountCollected > 0
+            ? (needsPendingBalanceConfirmation ? 'Record Partial Payment & Deliver' : 'Record Payment & Deliver')
+            : balanceDue > 0 ? 'Deliver with Balance' : balanceDue < 0 ? 'Deliver with Credit Balance' : 'Deliver Without Payment';
+    }
+}
+
+function openQueueDeliveryDialog(select) {
+    const dialog = document.getElementById('queue-delivery-dialog');
+    const form = document.getElementById('queue-delivery-form');
+    if (!dialog || !form) return;
+
+    const balanceDue = Number(select.dataset.balanceDue || 0);
+    const ticketId = select.dataset.ticketId;
+    form.action = `/tickets/${ticketId}/status`;
+    form.dataset.ticketId = ticketId;
+    form.dataset.ticketNo = select.dataset.ticketNo;
+    form.dataset.balanceDue = String(balanceDue);
+    form.dataset.customerTotalSet = select.dataset.customerTotalSet || '0';
+    form.querySelector('[name="csrf_token"]').value = select.dataset.csrfToken || '';
+    form.querySelector('[name="delivery_payment_mode"]').value = 'cash';
+    form.querySelector('[name="delivery_payment_note"]').value = '';
+
+    const amount = document.getElementById('queue-delivery-amount');
+    if (balanceDue > 0) {
+        amount.max = String(balanceDue);
+        amount.value = String(balanceDue);
+    } else {
+        amount.removeAttribute('max');
+        amount.value = '';
+    }
+    const customerTotalSet = form.dataset.customerTotalSet === '1';
+    document.getElementById('queue-delivery-balance-label').textContent = !customerTotalSet ? 'Customer total' : balanceDue < 0 ? 'Customer credit' : 'Balance due';
+    document.getElementById('queue-delivery-ticket-no').textContent = select.dataset.ticketNo;
+    document.getElementById('queue-delivery-balance').textContent = !customerTotalSet
+        ? 'Not set'
+        : balanceDue < 0
+            ? `₹${Math.abs(balanceDue).toLocaleString('en-IN')} credit`
+            : `₹${balanceDue.toLocaleString('en-IN')}`;
+    document.getElementById('queue-delivery-description').textContent = balanceDue > 0
+        ? 'Record the full or partial pending balance here, or deliver without collecting.'
+        : balanceDue < 0
+            ? 'This ticket has customer credit. Record any new payment collected now, or leave it blank to deliver.'
+            : !customerTotalSet
+                ? 'No customer total is set. Record any payment collected now, or leave it blank to deliver without payment.'
+                : 'No balance is due. Record any new payment collected now, or leave it blank to deliver without payment.';
+    document.getElementById('queue-delivery-error').classList.add('hidden');
+    document.getElementById('queue-delivery-error').textContent = '';
+
+    activeQueueDeliverySelect = select;
+    select.disabled = true;
+    updateQueueDeliveryConfirmation(amount);
+    dialog.showModal();
+    amount.focus();
+}
+
+function closeQueueDeliveryDialog() {
+    const dialog = document.getElementById('queue-delivery-dialog');
+    if (dialog?.open) dialog.close();
+    if (activeQueueDeliverySelect) {
+        activeQueueDeliverySelect.disabled = false;
+        activeQueueDeliverySelect.value = '';
+        activeQueueDeliverySelect = null;
+    }
+}
+
+async function submitQueueDelivery(event, form) {
+    event.preventDefault();
+    const submit = form.querySelector('[type="submit"]');
+    const errorBox = document.getElementById('queue-delivery-error');
+    const ticketId = form.dataset.ticketId;
+    const ticketNo = form.dataset.ticketNo;
+    submit.disabled = true;
+    submit.textContent = 'Saving…';
+    errorBox.classList.add('hidden');
+    errorBox.textContent = '';
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            credentials: 'same-origin'
+        });
+        if (response.ok && response.redirected && new URL(response.url).pathname === `/tickets/${ticketId}`) {
+            const paymentAmount = form.querySelector('[name="delivery_payment_amount"]').value;
+            const balanceDue = Number(form.dataset.balanceDue || 0);
+            const toastMessage = paymentAmount
+                ? `Payment recorded and ${ticketNo} delivered.`
+                : balanceDue > 0
+                    ? `${ticketNo} delivered with balance pending.`
+                    : balanceDue < 0
+                        ? `${ticketNo} delivered with customer credit.`
+                        : `${ticketNo} delivered without payment.`;
+            sessionStorage.setItem(
+                'repairQueueStatusToast',
+                toastMessage,
+            );
+            window.location.reload();
+            return;
+        }
+
+        const responseText = await response.text();
+        let message = 'Could not deliver this ticket. Please try again.';
+        try {
+            const payload = JSON.parse(responseText);
+            if (payload.detail) message = payload.detail;
+        } catch (_) {
+            const responseDocument = new DOMParser().parseFromString(responseText, 'text/html');
+            message = (responseDocument.body.textContent || '').trim() || message;
+        }
+        errorBox.textContent = message;
+        errorBox.classList.remove('hidden');
+    } catch (error) {
+        errorBox.textContent = 'Could not deliver this ticket. Check the connection and try again.';
+        errorBox.classList.remove('hidden');
+    } finally {
+        if (document.body.contains(submit)) submit.disabled = false;
+        if (!document.getElementById('queue-delivery-dialog')?.open) closeQueueDeliveryDialog();
+        else updateQueueDeliveryConfirmation(document.getElementById('queue-delivery-amount'));
+    }
+}
+
 async function changeQueueTicketStatus(select) {
     const nextStatus = select.value;
     const ticketId = select.dataset.ticketId;
     const ticketNo = select.dataset.ticketNo;
     if (!nextStatus || !ticketId) return;
+
+    const balanceDue = Number(select.dataset.balanceDue || 0);
+    if (nextStatus === 'delivered') {
+        openQueueDeliveryDialog(select);
+        return;
+    }
 
     const isClosedStatus = ['declined', 'unrepairable', 'delivered'].includes(nextStatus);
     const balanceDescription = select.dataset.balanceDescription;

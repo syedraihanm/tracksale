@@ -6,7 +6,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_current_session, require_login, verify_csrf
+from app.deps import get_current_session, require_section_pin, verify_csrf
 from app.formatting import format_inr, parse_money
 from app.models.cash_closing import CashClosing
 from app.models.settings import Settings as SettingsModel
@@ -20,7 +20,7 @@ from app.services.errors import PinRequired, ValidationFailed
 from app.templating import templates
 from app.timeutil import business_date
 
-router = APIRouter(prefix="/cash", dependencies=[Depends(require_login)])
+router = APIRouter(prefix="/cash", dependencies=[Depends(require_section_pin("cash"))])
 
 
 @router.get("", response_class=HTMLResponse)

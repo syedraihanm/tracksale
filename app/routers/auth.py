@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
-from app.deps import get_current_session
+from app.deps import SECTION_PIN_PATHS, get_current_session, verify_csrf
 from app.models.settings import Settings as SettingsModel
 from app.security import (
     create_session_data,
@@ -20,6 +20,13 @@ from app.templating import templates
 
 router = APIRouter()
 settings = get_settings()
+SHOP_NAME = "AMEE MOBILES"
+
+SECTION_PIN_LABELS = {
+    "inventory": "Parts Inventory",
+    "suppliers": "Suppliers",
+    "cash": "Daily Cash Close",
+}
 
 
 def get_client_ip(request: Request) -> str:
@@ -37,7 +44,7 @@ def setup_get(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         request=request,
         name="auth/setup.html",
-        context={"shop_name": setting.shop_name if setting else "Mobile Repair Shop"},
+        context={"shop_name": SHOP_NAME},
     )
 
 
@@ -45,22 +52,12 @@ def setup_get(request: Request, db: Session = Depends(get_db)):
 def setup_post(
     request: Request,
     response: Response,
-    shop_name: str = Form(...),
     shop_pin: str = Form(...),
     db: Session = Depends(get_db),
 ):
     setting = db.query(SettingsModel).filter_by(id=1).first()
     if setting and setting.setup_completed:
         raise HTTPException(status_code=404, detail="Setup already completed")
-
-    shop_name = shop_name.strip()
-    if not shop_name or len(shop_name) > 100:
-        return templates.TemplateResponse(
-            request=request,
-            name="auth/setup.html",
-            context={"error": "Shop name must be between 1 and 100 characters"},
-            status_code=422,
-        )
 
     shop_pin = shop_pin.strip()
     if not (shop_pin.isdigit() and 4 <= len(shop_pin) <= 6):
@@ -75,7 +72,7 @@ def setup_post(
         setting = SettingsModel(id=1)
         db.add(setting)
 
-    setting.shop_name = shop_name
+    setting.shop_name = SHOP_NAME
     shared_pin_hash = hash_secret(shop_pin)
     setting.admin_password_hash = shared_pin_hash
     setting.owner_pin_hash = shared_pin_hash
@@ -187,7 +184,7 @@ def logout_post(request: Request):
 
 
 @router.get("/pin", response_class=HTMLResponse)
-def pin_get(request: Request, next: str = "/"):
+def pin_get(request: Request, next: str = "/", section: str = ""):
     session = get_current_session(request)
     if not session or not session.get("user_id"):
         return RedirectResponse(url=f"/login?next=/pin?next={next}", status_code=status.HTTP_303_SEE_OTHER)
@@ -204,17 +201,20 @@ def pin_get(request: Request, next: str = "/"):
         context={
             "session": session,
             "next_url": next,
+            "section": section if section in SECTION_PIN_PATHS else "",
+            "section_name": SECTION_PIN_LABELS.get(section),
             "error": error,
         },
     )
 
 
-@router.post("/pin")
+@router.post("/pin", dependencies=[Depends(verify_csrf)])
 def pin_post(
     request: Request,
     response: Response,
     pin: str = Form(...),
     next: str = Form("/"),
+    section: str = Form(""),
     db: Session = Depends(get_db),
 ):
     session = get_current_session(request)
@@ -230,6 +230,8 @@ def pin_post(
             context={
                 "session": session,
                 "next_url": next,
+                "section": section if section in SECTION_PIN_PATHS else "",
+                "section_name": SECTION_PIN_LABELS.get(section),
                 "error": f"Too many failed PIN attempts. Locked for {remaining} seconds.",
             },
             status_code=429,
@@ -238,20 +240,36 @@ def pin_post(
     setting = db.query(SettingsModel).filter_by(id=1).first()
     if not setting or not setting.owner_pin_hash or not verify_secret(setting.owner_pin_hash, pin.strip()):
         locked_now, lock_duration = pin_limiter.record_failure(client_ip)
-        msg = f"Too many failed PIN attempts. Locked for {lock_duration} seconds." if locked_now else "Incorrect Owner PIN."
+        msg = f"Too many failed PIN attempts. Locked for {lock_duration} seconds." if locked_now else "Incorrect Shop PIN."
         status_code = 429 if locked_now else 403
         return templates.TemplateResponse(
             request=request,
             name="auth/pin.html",
-            context={"session": session, "next_url": next, "error": msg},
+            context={
+                "session": session,
+                "next_url": next,
+                "section": section if section in SECTION_PIN_PATHS else "",
+                "section_name": SECTION_PIN_LABELS.get(section),
+                "error": msg,
+            },
             status_code=status_code,
         )
 
     pin_limiter.record_success(client_ip)
     session["pin_unlocked_at"] = datetime.now(UTC).timestamp()
+    section = section if section in SECTION_PIN_PATHS else ""
+    if section:
+        session["section_pin_scope"] = section
+    else:
+        session.pop("section_pin_scope", None)
     token = encode_session(session)
 
-    target_url = next if next.startswith("/") else "/"
+    target_url = next if next.startswith("/") and not next.startswith("//") else "/"
+    if section:
+        section_root = SECTION_PIN_PATHS[section]
+        target_path = target_url.split("?", 1)[0]
+        if target_path != section_root and not target_path.startswith(f"{section_root}/"):
+            target_url = section_root
     resp = RedirectResponse(url=target_url, status_code=status.HTTP_303_SEE_OTHER)
     resp.set_cookie(
         key="session",

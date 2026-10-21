@@ -16,7 +16,7 @@ from app.services.errors import (
     PinRequired,
     ValidationFailed,
 )
-from app.services.payments import get_ticket_totals
+from app.services.payments import add_payment, get_ticket_totals
 from app.services.receipts import generate_qr_svg, generate_whatsapp_url
 from app.services.status import get_allowed_transitions, transition_ticket
 from app.services.tickets import (
@@ -170,7 +170,7 @@ def ticket_detail(request: Request, id: int, db: Session = Depends(get_db)):
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    items_total, net_paid, balance_due = get_ticket_totals(ticket)
+    customer_total, net_paid, balance_due = get_ticket_totals(ticket)
     allowed_transitions = get_allowed_transitions(ticket.status)
     under_w = is_under_warranty(ticket)
 
@@ -191,6 +191,7 @@ def ticket_detail(request: Request, id: int, db: Session = Depends(get_db)):
 
     # Non-deleted items
     visible_items = [i for i in ticket.items if not i.is_deleted]
+    item_cost_total = sum(i.cost_price for i in visible_items)
     # Payments list: keep all but flag deleted
     payments_list = sorted(ticket.payments, key=lambda p: p.paid_at, reverse=True)
 
@@ -214,7 +215,10 @@ def ticket_detail(request: Request, id: int, db: Session = Depends(get_db)):
         "shop_name": setting.shop_name if setting else "Mobile Repair Shop",
         "ticket": ticket,
         "age_days": days_ago(ticket.received_at),
-        "items_total": items_total,
+        "items_total": customer_total,
+        "customer_total": customer_total,
+        "customer_total_set": customer_total > 0,
+        "item_cost_total": item_cost_total,
         "net_paid": net_paid,
         "balance_due": balance_due,
         "allowed_transitions": allowed_transitions,
@@ -314,13 +318,39 @@ def ticket_change_status(
     note: str | None = Form(None),
     confirm_pending_balance: str | None = Form("0"),
     clear_passcode: str | None = Form("0"),
+    delivery_payment_amount: str | None = Form(None),
+    delivery_payment_mode: str = Form("cash"),
+    delivery_payment_note: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
-    ticket = db.query(Ticket).filter_by(id=id, is_deleted=False).first()
+    ticket = (
+        db.query(Ticket)
+        .options(joinedload(Ticket.items), joinedload(Ticket.payments))
+        .filter_by(id=id, is_deleted=False)
+        .first()
+    )
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     try:
+        if delivery_payment_amount and delivery_payment_amount.strip():
+            if to_status != "delivered":
+                raise ValidationFailed("A delivery payment can only be recorded while delivering the ticket")
+
+            payment_amount = parse_money(delivery_payment_amount)
+            _, _, balance_due = get_ticket_totals(ticket)
+            if balance_due > 0 and payment_amount > balance_due:
+                raise ValidationFailed("Delivery payment cannot exceed the balance due")
+
+            add_payment(
+                db=db,
+                ticket=ticket,
+                amount=payment_amount,
+                mode=delivery_payment_mode,
+                kind="final",
+                note=delivery_payment_note,
+            )
+
         transition_ticket(
             db=db,
             ticket=ticket,
@@ -337,6 +367,9 @@ def ticket_change_status(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except DomainError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
@@ -400,7 +433,7 @@ def ticket_receipt(request: Request, id: int, db: Session = Depends(get_db)):
     setting = db.query(SettingsModel).filter_by(id=1).first()
     session = get_current_session(request)
 
-    items_total, net_paid, balance_due = get_ticket_totals(ticket)
+    customer_total, net_paid, balance_due = get_ticket_totals(ticket)
     qr_svg = generate_qr_svg(ticket.ticket_no)
 
     wa_url = generate_whatsapp_url(
@@ -416,7 +449,9 @@ def ticket_receipt(request: Request, id: int, db: Session = Depends(get_db)):
             "session": session,
             "setting": setting,
             "ticket": ticket,
-            "items_total": items_total,
+            "items_total": customer_total,
+            "customer_total": customer_total,
+            "customer_total_set": customer_total > 0,
             "net_paid": net_paid,
             "balance_due": balance_due,
             "qr_svg": qr_svg,

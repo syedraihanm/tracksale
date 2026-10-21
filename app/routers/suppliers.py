@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_current_session, require_login, verify_csrf
+from app.deps import get_current_session, require_section_pin, verify_csrf
 from app.formatting import parse_money
 from app.models.settings import Settings as SettingsModel
 from app.services.errors import ValidationFailed
@@ -17,11 +17,12 @@ from app.services.suppliers import (
     get_supplier,
     get_supplier_ledger,
     record_supplier_payment,
+    add_supplier_pending_balance,
     update_supplier,
 )
 from app.templating import templates
 
-router = APIRouter(prefix="/suppliers", dependencies=[Depends(require_login)])
+router = APIRouter(prefix="/suppliers", dependencies=[Depends(require_section_pin("suppliers"))])
 
 
 @router.get("", response_class=HTMLResponse)
@@ -169,6 +170,34 @@ def supplier_delete(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
     return RedirectResponse(url="/suppliers", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{id}/pending-balance", dependencies=[Depends(verify_csrf)])
+def supplier_add_pending_balance(
+    id: int,
+    amount: str = Form(...),
+    notes: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    """Add an amount to the supplier's pending balance."""
+    sup = get_supplier(db, id)
+    if not sup:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    try:
+        parsed_amount = parse_money(amount)
+        add_supplier_pending_balance(
+            db=db,
+            supplier=sup,
+            amount=parsed_amount,
+            notes=notes,
+        )
+        db.commit()
+    except (ValidationFailed, ValueError) as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+    return RedirectResponse(url=f"/suppliers/{id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{id}/payments", dependencies=[Depends(verify_csrf)])

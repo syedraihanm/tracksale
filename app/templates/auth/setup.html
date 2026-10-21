@@ -7,7 +7,8 @@
     <div class="w-full max-w-md bg-white p-8 rounded-xl shadow-md border border-slate-200">
         <div class="text-center mb-6">
             <h1 class="text-2xl font-bold text-slate-800">Shop System Setup</h1>
-            <p class="text-sm text-slate-600 mt-1">Configure your repair shop and one PIN for the system</p>
+            <p class="text-sm font-semibold text-brand-700 mt-2">{{ shop_name|default('AMEE MOBILES') }}</p>
+            <p class="text-sm text-slate-600 mt-1">Create one PIN for sign in and owner authorization</p>
         </div>
 
         {% if error %}
@@ -17,16 +18,6 @@
         {% endif %}
 
         <form method="POST" action="/setup" class="space-y-4">
-            <div>
-                <label for="shop_name" class="block text-sm font-medium text-slate-700">Shop Name</label>
-                <input type="text"
-                       id="shop_name"
-                       name="shop_name"
-                       value="{{ shop_name|default('Mobile Repair Shop') }}"
-                       required
-                       class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 text-sm">
-            </div>
-
             <div>
                 <label for="shop_pin" class="block text-sm font-medium text-slate-700">Shop PIN</label>
                 <input type="password"

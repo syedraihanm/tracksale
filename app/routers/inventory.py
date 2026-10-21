@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_current_session, require_login, verify_csrf
+from app.deps import get_current_session, require_section_pin, verify_csrf
 from app.formatting import parse_money
 from app.models.enums import SPARE_CATEGORIES
 from app.models.inventory import InventoryItem
@@ -19,7 +19,7 @@ from app.services.inventory import (
 )
 from app.templating import templates
 
-router = APIRouter(prefix="/inventory", dependencies=[Depends(require_login)])
+router = APIRouter(prefix="/inventory", dependencies=[Depends(require_section_pin("inventory"))])
 
 
 @router.get("", response_class=HTMLResponse)

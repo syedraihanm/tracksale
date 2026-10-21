@@ -20,7 +20,6 @@ def route_add_item(
     id: int,
     item_type: str = Form(...),
     description: str = Form(...),
-    price_charged: str = Form(...),
     cost_price: str = Form("0"),
     supplier_name: str | None = Form(None),
     supplier_id: str | None = Form(None),
@@ -33,7 +32,6 @@ def route_add_item(
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     try:
-        price = parse_money(price_charged)
         cost = parse_money(cost_price)
         inv_id = int(inventory_item_id.strip()) if (inventory_item_id and inventory_item_id.strip().isdigit()) else None
         sup_id = int(supplier_id.strip()) if (supplier_id and supplier_id.strip().isdigit()) else None
@@ -42,7 +40,7 @@ def route_add_item(
             ticket=ticket,
             item_type=item_type,
             description=description,
-            price_charged=price,
+            price_charged=0,
             cost_price=cost,
             supplier_name=supplier_name,
             supplier_id=sup_id,
@@ -65,7 +63,6 @@ def route_edit_item(
     request: Request,
     id: int,
     description: str = Form(...),
-    price_charged: str = Form(...),
     cost_price: str = Form("0"),
     supplier_name: str | None = Form(None),
     supplier_id: str | None = Form(None),
@@ -77,14 +74,13 @@ def route_edit_item(
         raise HTTPException(status_code=404, detail="Item not found")
 
     try:
-        price = parse_money(price_charged)
         cost = parse_money(cost_price)
         sup_id = int(supplier_id.strip()) if (supplier_id and supplier_id.strip().isdigit()) else None
         edit_item(
             db=db,
             item=item,
             description=description,
-            price_charged=price,
+            price_charged=item.price_charged,
             cost_price=cost,
             supplier_name=supplier_name,
             supplier_id=sup_id,

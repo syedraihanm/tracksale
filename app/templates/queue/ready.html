@@ -49,7 +49,9 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right font-mono font-bold text-slate-900">
-                            {% if item.balance_due > 0 %}
+                            {% if not item.customer_total_set %}
+                            <span class="text-slate-400">Not set</span>
+                            {% elif item.balance_due > 0 %}
                             {{ item.balance_due|inr }}
                             {% elif item.balance_due < 0 %}
                             <span class="text-emerald-600">Credit {{ item.balance_due|abs|inr }}</span>

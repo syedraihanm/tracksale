@@ -30,6 +30,7 @@ class Supplier(Base, TimestampMixin):
     contact_person: Mapped[str | None] = mapped_column(String(100), nullable=True)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pending_adjustment: Mapped[int] = mapped_column("opening_balance", Integer, nullable=False, default=0, server_default="0")
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
 
     ticket_items: Mapped[list["TicketItem"]] = relationship("TicketItem", back_populates="supplier")

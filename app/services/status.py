@@ -7,6 +7,7 @@ from app.models.status_history import StatusHistory
 from app.models.ticket import Ticket
 from app.services.audit import record_audit
 from app.services.errors import InvalidTransition, NeedsConfirmation
+from app.services.payments import get_ticket_totals
 from app.timeutil import business_date, utc_now
 
 VALID_TRANSITIONS: dict[str, list[str]] = {
@@ -72,9 +73,7 @@ def transition_ticket(
     # Delivery gate checks
     if to_status == TicketStatus.DELIVERED.value:
         # Calculate balance
-        items_total = sum(i.price_charged for i in ticket.items if not i.is_deleted)
-        net_paid = sum(p.amount for p in ticket.payments if not p.is_deleted)
-        balance_due = items_total - net_paid
+        _, _, balance_due = get_ticket_totals(ticket)
 
         from app.formatting import format_inr
         if balance_due != 0 and not confirm_pending_balance:

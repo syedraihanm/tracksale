@@ -9,6 +9,7 @@ from app.models.enums import Outcome, PaymentMode, TicketStatus
 from app.models.payment import Payment
 from app.models.status_history import StatusHistory
 from app.models.ticket import Ticket
+from app.services.payments import get_ticket_totals
 from app.timeutil import business_date, ist_date_range_to_utc_bounds
 
 
@@ -66,6 +67,7 @@ def compute_reports(
         db.query(Ticket)
         .options(
             joinedload(Ticket.items),
+            joinedload(Ticket.payments),
             joinedload(Ticket.child_tickets),
         )
         .filter(
@@ -83,7 +85,8 @@ def compute_reports(
 
     for t in delivered_tickets:
         ticket_items = [i for i in t.items if not i.is_deleted]
-        billed_value += sum(i.price_charged for i in ticket_items)
+        customer_total, net_paid, _ = get_ticket_totals(t)
+        billed_value += customer_total if customer_total > 0 else net_paid
         part_items = [i for i in ticket_items if i.type == "part"]
         parts_cost += sum(i.cost_price for i in part_items)
 

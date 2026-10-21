@@ -23,15 +23,23 @@ def is_cash_day_closed(db: Session, target_date: date) -> bool:
 
 
 def get_ticket_totals(ticket: Ticket) -> tuple[int, int, int]:
-    """Calculate (items_total, net_paid, balance_due) for a ticket."""
+    """Calculate (customer_total, net_paid, balance_due) for a ticket.
+
+    Item cost is tracked separately. Existing line-item charges remain the
+    customer total for older tickets; otherwise the ticket estimate is used
+    when one exists. A payment alone does not create a customer charge.
+    """
     from sqlalchemy.orm import object_session
     s = object_session(ticket)
     if s:
         s.refresh(ticket, ["items", "payments"])
-    items_total = sum(i.price_charged for i in ticket.items if not i.is_deleted)
+    legacy_line_charges = sum(i.price_charged for i in ticket.items if not i.is_deleted)
+    customer_total = legacy_line_charges or (ticket.estimate_amount or 0)
     net_paid = sum(p.amount for p in ticket.payments if not p.is_deleted)
-    balance_due = items_total - net_paid
-    return items_total, net_paid, balance_due
+    # When no customer total has been entered yet, keep payments separate and
+    # do not mislabel them as a credit balance against the shop's item costs.
+    balance_due = customer_total - net_paid if customer_total > 0 else 0
+    return customer_total, net_paid, balance_due
 
 
 def add_payment(
@@ -44,7 +52,7 @@ def add_payment(
     confirm_overpay: bool = False,
     now: datetime | None = None,
 ) -> Payment:
-    """Add a payment to a ticket with validation, day-closed check, overpayment check, and audit."""
+    """Record customer money received separately from ticket item costs."""
     current_time = now or utc_now()
     payment_ist_date = business_date(current_time)
 
@@ -57,8 +65,6 @@ def add_payment(
 
     if kind not in (PaymentKind.ADVANCE.value, PaymentKind.FINAL.value, PaymentKind.REFUND.value):
         raise ValidationFailed("Payment kind must be advance, final, or refund")
-
-    items_total, net_paid, _ = get_ticket_totals(ticket)
 
     # Refund handling
     if kind == PaymentKind.REFUND.value:
@@ -78,42 +84,8 @@ def add_payment(
         if amount > 10_00_000:
             raise ValidationFailed("Payment amount exceeds sanity cap of ₹10,00,000")
 
-        # Overpayment handling: if payment exceeds reference total, add excess as labor automatically
-        ref_total = items_total if items_total > 0 else (ticket.estimate_amount or 0)
-        new_net_paid = net_paid + amount
-        if ref_total > 0 and new_net_paid > ref_total:
-            excess = new_net_paid - ref_total
-            from app.services.items import add_item
-
-            add_item(
-                db=db,
-                ticket=ticket,
-                item_type="labor",
-                description="Labor",
-                price_charged=excess,
-                now=current_time,
-                bypass_pin=True,
-            )
-            stored_amount = amount
-            audit_reason = "auto-added labor for excess payment"
-        elif items_total == 0 and (ticket.estimate_amount or 0) == 0 and kind == PaymentKind.FINAL.value:
-            excess = amount
-            from app.services.items import add_item
-
-            add_item(
-                db=db,
-                ticket=ticket,
-                item_type="labor",
-                description="Labor",
-                price_charged=excess,
-                now=current_time,
-                bypass_pin=True,
-            )
-            stored_amount = amount
-            audit_reason = "auto-added labor for final payment"
-        else:
-            stored_amount = amount
-            audit_reason = None
+        stored_amount = amount
+        audit_reason = None
 
     payment = Payment(
         ticket_id=ticket.id,

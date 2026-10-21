@@ -111,29 +111,34 @@
 
         <!-- Financial Summary -->
         <div class="text-xs space-y-2 pb-4 border-b border-slate-100">
-            {% if ticket.estimate_amount %}
+            {% if ticket.estimate_amount and ticket.estimate_amount != customer_total %}
             <div class="flex justify-between text-slate-600">
-                <span>Estimated Cost:</span>
+                <span>Estimated Customer Total:</span>
                 <span class="font-mono font-medium">{{ ticket.estimate_amount|inr }}</span>
             </div>
             {% endif %}
 
-            {% if items_total > 0 %}
+            {% if customer_total_set %}
             <div class="flex justify-between text-slate-600">
-                <span>Total Line Items:</span>
-                <span class="font-mono font-medium">{{ items_total|inr }}</span>
+                <span>Customer Total:</span>
+                <span class="font-mono font-medium">{{ customer_total|inr }}</span>
+            </div>
+            {% else %}
+            <div class="flex justify-between text-slate-600">
+                <span>Customer Total:</span>
+                <span class="font-mono font-medium">Not set</span>
             </div>
             {% endif %}
 
             <div class="flex justify-between text-slate-700">
-                <span>Amount Paid (Advance / Net):</span>
+                <span>Customer Payments Received:</span>
                 <span class="font-mono font-bold text-emerald-600">{{ net_paid|inr }}</span>
             </div>
 
             <div class="flex justify-between text-sm font-extrabold text-slate-900 pt-1 border-t border-slate-100">
                 <span>Balance Due:</span>
                 <span class="font-mono {% if balance_due > 0 %}text-slate-900{% elif balance_due < 0 %}text-emerald-600{% else %}text-slate-500{% endif %}">
-                    {% if balance_due < 0 %}Credit {{ balance_due|abs|inr }}{% else %}{{ balance_due|inr }}{% endif %}
+                    {% if customer_total_set %}{% if balance_due < 0 %}Credit {{ balance_due|abs|inr }}{% else %}{{ balance_due|inr }}{% endif %}{% else %}Not set{% endif %}
                 </span>
             </div>
         </div>

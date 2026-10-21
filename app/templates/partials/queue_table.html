@@ -99,6 +99,8 @@
                                     data-ticket-id="{{ item.ticket.id }}"
                                     data-ticket-no="{{ item.ticket.ticket_no }}"
                                     data-csrf-token="{{ session.csrf_token }}"
+                                    data-balance-due="{{ item.balance_due }}"
+                                    data-customer-total-set="{{ '1' if item.customer_total_set else '0' }}"
                                     data-balance-description="{% if item.balance_due > 0 %}unpaid balance of {{ item.balance_due|inr }}{% elif item.balance_due < 0 %}credit balance of {{ item.balance_due|abs|inr }}{% endif %}"
                                     onchange="changeQueueTicketStatus(this)"
                                     onclick="event.stopPropagation()"

@@ -1,12 +1,21 @@
 from datetime import UTC, datetime
+from urllib.parse import urlencode
 
 from fastapi import Depends, HTTPException, Request, Response, status
 
 from app.security import (
     PIN_UNLOCK_MAX_AGE,
+    SESSION_MAX_AGE,
     decode_session,
     encode_session,
 )
+
+
+SECTION_PIN_PATHS = {
+    "inventory": "/inventory",
+    "suppliers": "/suppliers",
+    "cash": "/cash",
+}
 
 
 def get_current_session(request: Request) -> dict | None:
@@ -17,7 +26,7 @@ def get_current_session(request: Request) -> dict | None:
     return data
 
 
-def require_login(request: Request) -> dict:
+def require_login(request: Request, response: Response) -> dict:
     session = get_current_session(request)
     if not session or not session.get("user_id"):
         # Check if HTMX request
@@ -30,7 +39,52 @@ def require_login(request: Request) -> dict:
             status_code=status.HTTP_303_SEE_OTHER,
             headers={"Location": f"/login?next={request.url.path}"},
         )
+
+    # A section PIN grant lasts only while the user stays in that section.
+    # Persist the cleared grant so browser Back or a direct URL cannot reuse it.
+    section = session.get("section_pin_scope")
+    section_root = SECTION_PIN_PATHS.get(section)
+    if section_root and not (
+        request.url.path == section_root or request.url.path.startswith(f"{section_root}/")
+    ):
+        session.pop("section_pin_scope", None)
+        from app.config import get_settings
+
+        response.set_cookie(
+            key="session",
+            value=encode_session(session),
+            max_age=SESSION_MAX_AGE,
+            httponly=True,
+            samesite="lax",
+            secure=get_settings().COOKIE_SECURE,
+        )
     return session
+
+
+def require_section_pin(section: str):
+    """Require a fresh Shop PIN grant for a protected section."""
+    if section not in SECTION_PIN_PATHS:
+        raise ValueError(f"Unknown PIN protected section: {section}")
+
+    def dependency(request: Request, session: dict = Depends(require_login)) -> dict:
+        if session.get("section_pin_scope") == section:
+            return session
+
+        target = request.url.path
+        if request.url.query:
+            target = f"{target}?{request.url.query}"
+        unlock_url = f"/pin?{urlencode({'section': section, 'next': target})}"
+        if request.headers.get("HX-Request") == "true":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                headers={"HX-Redirect": unlock_url},
+            )
+        raise HTTPException(
+            status_code=status.HTTP_303_SEE_OTHER,
+            headers={"Location": unlock_url},
+        )
+
+    return dependency
 
 
 async def verify_csrf(request: Request, session: dict = Depends(require_login)) -> None:

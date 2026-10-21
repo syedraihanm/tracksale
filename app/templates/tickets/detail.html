@@ -48,6 +48,12 @@
     <!-- Top Header Bar -->
     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="flex items-center gap-3 flex-wrap">
+            <a href="/"
+               class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+               aria-label="Back to Repair Queue">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7M8 12h13"></path></svg>
+                Repair Queue
+            </a>
             <h1 class="text-2xl font-extrabold text-slate-900 font-mono">{{ ticket.ticket_no }}</h1>
             <span class="px-3 py-1 rounded-full text-xs font-semibold border badge-{{ ticket.status }}">
                 {{ ticket.status|replace('_', ' ')|capitalize }}
@@ -144,7 +150,7 @@
                             <span class="font-mono text-slate-800">{{ ticket.imei_or_serial or '-' }}</span>
                         </div>
                         <div>
-                            <span class="text-xs text-slate-400 block uppercase">Estimate</span>
+                            <span class="text-xs text-slate-400 block uppercase">Customer Estimate</span>
                             <span class="font-mono font-bold text-slate-900">{{ ticket.estimate_amount|inr if ticket.estimate_amount else '-' }}</span>
                         </div>
                     </div>
@@ -246,7 +252,7 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-medium text-slate-700">Estimate ₹</label>
+                            <label class="block text-xs font-medium text-slate-700">Estimated Customer Total ₹</label>
                             <input type="text" name="estimate_amount" value="{{ ticket.estimate_amount or '' }}" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs font-mono">
                         </div>
                         <div>
@@ -265,7 +271,7 @@
             <div id="ticket-line-items" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <h2 class="text-base font-bold text-slate-800">Repair Line Items</h2>
-                    <span class="text-xs font-mono font-bold text-slate-600">Total Charged: {{ items_total|inr }}</span>
+                    <span class="text-xs font-mono font-bold text-slate-600">Item Cost Total: {{ item_cost_total|inr }}</span>
                 </div>
 
                 <!-- Existing Items Table -->
@@ -276,8 +282,7 @@
                             <tr>
                                 <th class="px-3 py-2">Type</th>
                                 <th class="px-3 py-2">Description</th>
-                                <th class="px-3 py-2 text-right">Price Charged</th>
-                                <th class="px-3 py-2 text-right">Part Cost</th>
+                                <th class="px-3 py-2 text-right">Item Cost</th>
                                 <th class="px-3 py-2">Supplier</th>
                                 <th class="px-3 py-2 text-right">Action</th>
                             </tr>
@@ -296,7 +301,6 @@
                                     </span>
                                     {% endif %}
                                 </td>
-                                <td class="px-3 py-2 text-right font-mono font-bold">{{ it.price_charged|inr }}</td>
                                 <td class="px-3 py-2 text-right font-mono text-slate-500">
                                     {% if it.type == 'part' %}{{ it.cost_price|inr }}{% else %}-{% endif %}
                                 </td>
@@ -325,6 +329,7 @@
                 {% if not ticket.is_deleted %}
                 <div class="pt-3 border-t border-slate-100 bg-slate-50 p-4 rounded-lg">
                     <span class="text-xs font-bold text-slate-700 block mb-2">+ Add Line Item</span>
+                    <p class="text-[11px] text-slate-500 mb-3">Record the part cost here. Customer payments are entered separately below.</p>
                     <form method="POST" action="/tickets/{{ ticket.id }}/items" class="space-y-3">
                         <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
                         <input type="hidden" name="inventory_item_id" id="item_inventory_item_id" value="">
@@ -390,7 +395,6 @@
                                              data-type="{{ inv.spare_type }}"
                                              data-model="{{ inv.model }}"
                                              data-cost="{{ inv.cost_price }}"
-                                             data-selling="{{ inv.selling_price }}"
                                              data-supplier="{{ inv.supplier_name or '' }}"
                                              data-notes="{{ inv.notes or '' }}"
                                              data-qty="{{ inv.quantity }}"
@@ -424,12 +428,6 @@
                                                     <span class="text-[10px] text-slate-400 block">Cost</span>
                                                     <span class="font-mono text-slate-600">{{ inv.cost_price|inr }}</span>
                                                 </div>
-                                                {% if inv.selling_price %}
-                                                <div>
-                                                    <span class="text-[10px] text-slate-400 block">Selling</span>
-                                                    <span class="font-mono font-bold text-emerald-700">{{ inv.selling_price|inr }}</span>
-                                                </div>
-                                                {% endif %}
                                             </div>
                                         </div>
                                         {% endfor %}
@@ -449,7 +447,7 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
                             <div>
                                 <label class="block text-[11px] text-slate-600">Type</label>
                                 <select name="item_type"
@@ -463,10 +461,6 @@
                             <div class="md:col-span-2">
                                 <label class="block text-[11px] text-slate-600">Description *</label>
                                 <input type="text" name="description" id="item_description_input" required placeholder="e.g. Display replacement, Charging flex" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded">
-                            </div>
-                            <div>
-                                <label class="block text-[11px] text-slate-600">Price Charged ₹ *</label>
-                                <input type="text" name="price_charged" id="item_price_charged_input" required placeholder="e.g. 1500" class="mt-1 w-full px-2 py-1.5 border border-slate-300 rounded font-mono">
                             </div>
                         </div>
 
@@ -502,7 +496,7 @@
 
                         {% if ticket.status == 'delivered' %}
                         <div class="text-xs text-amber-700 bg-amber-50 p-2 rounded flex items-center gap-2">
-                            <span>Ticket is delivered. Owner PIN required to alter billing:</span>
+                            <span>Ticket is delivered. Owner PIN required to alter item costs:</span>
                             <input type="password" name="owner_pin" required placeholder="PIN" class="px-2 py-1 border border-amber-300 rounded w-20">
                         </div>
                         {% endif %}
@@ -520,11 +514,11 @@
             <!-- Payments & Balance Card -->
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <h2 class="text-base font-bold text-slate-800">Payments & Balance</h2>
+                    <h2 class="text-base font-bold text-slate-800">Customer Payments</h2>
                     <div class="text-right">
-                        <span class="text-xs text-slate-400 block uppercase">Balance Due</span>
+                        <span class="text-xs text-slate-400 block uppercase">{% if customer_total_set %}Balance Due{% else %}Customer Total{% endif %}</span>
                         <span class="font-mono text-lg font-extrabold {% if balance_due > 0 %}text-slate-900{% elif balance_due < 0 %}text-emerald-600{% else %}text-slate-500{% endif %}">
-                            {% if balance_due < 0 %}Credit {{ balance_due|abs|inr }}{% else %}{{ balance_due|inr }}{% endif %}
+                            {% if customer_total_set %}{% if balance_due < 0 %}Credit {{ balance_due|abs|inr }}{% else %}{{ balance_due|inr }}{% endif %}{% else %}Not set{% endif %}
                         </span>
                     </div>
                 </div>
@@ -733,7 +727,7 @@
 
 <!-- Delivery Confirmation Dialog -->
 <dialog id="delivery-dialog" class="p-6 rounded-xl shadow-2xl border border-slate-200 max-w-md w-full bg-white">
-    <form method="POST" action="/tickets/{{ ticket.id }}/status" class="space-y-4">
+    <form method="POST" action="/tickets/{{ ticket.id }}/status" class="space-y-4" onsubmit="submitTicketDelivery(event, this)">
         <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
         <input type="hidden" name="to_status" value="delivered">
 
@@ -743,36 +737,66 @@
         <!-- Balance Info -->
         <div class="p-3 bg-slate-50 rounded-lg text-xs space-y-1">
             <div class="flex justify-between">
-                <span>Total Line Items:</span>
-                <span class="font-mono font-medium">{{ items_total|inr }}</span>
+                <span>Customer Total:</span>
+                <span class="font-mono font-medium">{% if customer_total_set %}{{ customer_total|inr }}{% else %}Not set{% endif %}</span>
             </div>
             <div class="flex justify-between">
-                <span>Total Paid:</span>
+                <span>Total Customer Payments:</span>
                 <span class="font-mono font-medium text-emerald-600">{{ net_paid|inr }}</span>
             </div>
             <div class="flex justify-between font-bold pt-1 border-t border-slate-200">
                 <span>Balance Due:</span>
                 <span class="font-mono {% if balance_due > 0 %}text-amber-600{% elif balance_due < 0 %}text-emerald-600{% else %}text-slate-700{% endif %}">
-                    {% if balance_due < 0 %}Credit {{ balance_due|abs|inr }}{% else %}{{ balance_due|inr }}{% endif %}
+                    {% if customer_total_set %}{% if balance_due < 0 %}Credit {{ balance_due|abs|inr }}{% else %}{{ balance_due|inr }}{% endif %}{% else %}Not set{% endif %}
                 </span>
             </div>
         </div>
 
-        {% if balance_due != 0 %}
+        {% if balance_due > 0 %}
         <div class="p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
-            {% if balance_due > 0 %}
             Ticket has an unpaid balance of <strong>{{ balance_due|inr }}</strong>.
-            {% else %}
+        </div>
+        {% elif balance_due < 0 %}
+        <div class="p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
             Customer has a credit balance of <strong>{{ balance_due|abs|inr }}</strong>. Consider refunding before delivery.
-            {% endif %}
-            <label class="flex items-center gap-2 mt-2 font-semibold cursor-pointer">
-                <input type="checkbox" name="confirm_pending_balance" value="1" required class="rounded text-brand-600">
-                <span>Confirm delivery with pending balance</span>
+        </div>
+        {% endif %}
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg space-y-3" data-balance-due="{{ balance_due }}" data-customer-total-set="{{ '1' if customer_total_set else '0' }}">
+            <div>
+                <h4 class="text-xs font-bold text-emerald-900">Record customer payment (optional)</h4>
+                {% if balance_due > 0 %}
+                <p class="mt-0.5 text-[11px] text-emerald-800">The pending balance is prefilled. You can enter a partial amount or clear it to deliver without collecting.</p>
+                {% elif customer_total_set %}
+                <p class="mt-0.5 text-[11px] text-emerald-800">No balance is due. Enter any new payment collected now, or leave it blank to deliver without recording a payment.</p>
+                {% else %}
+                <p class="mt-0.5 text-[11px] text-emerald-800">No customer total is set. Enter any payment collected now, or leave it blank to deliver without recording a payment.</p>
+                {% endif %}
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <label class="text-[11px] font-semibold text-slate-700">Amount collected ₹
+                    <input type="number" name="delivery_payment_amount" min="1" {% if balance_due > 0 %}max="{{ balance_due }}" value="{{ balance_due }}"{% endif %} step="1" placeholder="Optional"
+                           oninput="updateDeliveryBalanceConfirmation(this)"
+                           class="mt-1 w-full px-2.5 py-2 border border-slate-300 rounded-lg bg-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </label>
+                <label class="text-[11px] font-semibold text-slate-700">Payment method
+                    <select name="delivery_payment_mode" class="mt-1 w-full px-2.5 py-2 border border-slate-300 rounded-lg bg-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="cash">Cash</option>
+                        <option value="upi">UPI</option>
+                        <option value="card">Card</option>
+                    </select>
+                </label>
+            </div>
+            <label class="block text-[11px] font-medium text-slate-700">Payment note (optional)
+                <input type="text" name="delivery_payment_note" maxlength="500" placeholder="UPI reference or note"
+                       class="mt-1 w-full px-2.5 py-2 border border-slate-300 rounded-lg bg-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
             </label>
         </div>
-        {% else %}
-        <input type="hidden" name="confirm_pending_balance" value="1">
-        {% endif %}
+        <div id="delivery-remaining-balance-confirmation" class="hidden p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
+            <label class="flex items-center gap-2 font-semibold cursor-pointer">
+                <input type="checkbox" name="confirm_pending_balance" value="1" class="rounded text-brand-600">
+                <span id="delivery-balance-confirmation-label">Confirm delivery with the remaining balance unpaid</span>
+            </label>
+        </div>
 
         <div>
             <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
@@ -786,9 +810,10 @@
             <input type="text" name="note" placeholder="e.g. Handed over to customer" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs">
         </div>
 
+        <div id="ticket-delivery-error" class="hidden rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800" role="alert"></div>
         <div class="flex justify-end gap-2 pt-2">
             <button type="button" onclick="closeModal('delivery-dialog')" class="px-4 py-2 text-xs text-slate-600 hover:text-slate-900">Cancel</button>
-            <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded text-xs font-bold transition">Confirm Delivery</button>
+            <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded text-xs font-bold transition">{% if balance_due > 0 %}Record Payment & Deliver{% else %}Deliver Ticket{% endif %}</button>
         </div>
     </form>
 </dialog>
@@ -842,6 +867,82 @@
 </dialog>
 
 <script>
+function updateDeliveryBalanceConfirmation(input) {
+    const container = input.closest('[data-balance-due]');
+    const balanceDue = Number(container?.dataset.balanceDue || 0);
+    const amountCollected = Number(input.value || 0);
+    const confirmation = document.getElementById('delivery-remaining-balance-confirmation');
+    const checkbox = confirmation?.querySelector('input[name="confirm_pending_balance"]');
+    if (!confirmation || !checkbox) return;
+
+    const needsPendingBalanceConfirmation = balanceDue > 0 && amountCollected < balanceDue;
+    const customerTotalSet = container?.dataset.customerTotalSet === '1';
+    const needsCreditConfirmation = customerTotalSet && (balanceDue < 0 || (balanceDue === 0 && amountCollected > 0));
+    const needsConfirmation = needsPendingBalanceConfirmation || needsCreditConfirmation;
+    confirmation.classList.toggle('hidden', !needsConfirmation);
+    checkbox.required = needsConfirmation;
+    if (!needsConfirmation) checkbox.checked = false;
+    const confirmationLabel = document.getElementById('delivery-balance-confirmation-label');
+    if (confirmationLabel) {
+        confirmationLabel.textContent = needsCreditConfirmation
+            ? 'Confirm delivery with the customer credit balance'
+            : 'Confirm delivery with the remaining balance unpaid';
+    }
+
+    const submit = input.form?.querySelector('[type="submit"]');
+    if (submit) {
+        submit.textContent = amountCollected > 0
+            ? (needsPendingBalanceConfirmation ? 'Record Partial Payment & Deliver' : 'Record Payment & Deliver')
+            : balanceDue > 0 ? 'Deliver with Balance' : balanceDue < 0 ? 'Deliver with Credit Balance' : 'Deliver Without Payment';
+    }
+}
+
+const initialDeliveryPaymentInput = document.querySelector('#delivery-dialog [name="delivery_payment_amount"]');
+if (initialDeliveryPaymentInput) updateDeliveryBalanceConfirmation(initialDeliveryPaymentInput);
+
+async function submitTicketDelivery(event, form) {
+    event.preventDefault();
+    const submit = form.querySelector('[type="submit"]');
+    const errorBox = document.getElementById('ticket-delivery-error');
+    submit.disabled = true;
+    submit.textContent = 'Saving…';
+    errorBox.classList.add('hidden');
+    errorBox.textContent = '';
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            credentials: 'same-origin'
+        });
+        if (response.ok && response.redirected) {
+            window.location.assign(response.url);
+            return;
+        }
+
+        const responseText = await response.text();
+        let message = 'Could not deliver this ticket. Please try again.';
+        try {
+            const payload = JSON.parse(responseText);
+            if (payload.detail) message = payload.detail;
+        } catch (_) {
+            const responseDocument = new DOMParser().parseFromString(responseText, 'text/html');
+            message = (responseDocument.body.textContent || '').trim() || message;
+        }
+        errorBox.textContent = message;
+        errorBox.classList.remove('hidden');
+    } catch (error) {
+        errorBox.textContent = 'Could not deliver this ticket. Check the connection and try again.';
+        errorBox.classList.remove('hidden');
+    } finally {
+        if (document.body.contains(submit)) {
+            submit.disabled = false;
+            const amount = form.querySelector('[name="delivery_payment_amount"]');
+            if (amount) updateDeliveryBalanceConfirmation(amount);
+        }
+    }
+}
+
 function openDeletePaymentModal(paymentId, amountStr) {
     const form = document.getElementById('delete-payment-form');
     form.action = `/payments/${paymentId}/delete`;
@@ -895,13 +996,11 @@ function selectInventoryItem(el) {
     const spareType = el.getAttribute('data-type') || '';
     const spareModel = el.getAttribute('data-model') || '';
     const cost = el.getAttribute('data-cost');
-    const selling = el.getAttribute('data-selling');
     const supplier = el.getAttribute('data-supplier');
 
     const invIdInput = document.getElementById('item_inventory_item_id');
     const descInput = document.getElementById('item_description_input');
     const costInput = document.getElementById('item_cost_price_input');
-    const priceChargedInput = document.getElementById('item_price_charged_input');
     const supplierInput = document.getElementById('item_supplier_name_input');
     const typeSelect = document.getElementById('item_type_select');
 
@@ -919,12 +1018,6 @@ function selectInventoryItem(el) {
     if (descInput) descInput.value = `${formattedType} - ${spareModel}`;
 
     if (costInput && cost) costInput.value = cost;
-    if (priceChargedInput) {
-        if (selling && parseFloat(selling) > 0) {
-            priceChargedInput.value = selling;
-        } else if (cost && parseFloat(cost) > 0) {
-            priceChargedInput.value = cost;
-        }
     if (supplierInput && supplier) {
         supplierInput.value = supplier;
         const supSelect = document.getElementById('item_supplier_select');
@@ -1011,7 +1104,6 @@ function onInventorySelect(select) {
     const invIdInput = document.getElementById('item_inventory_item_id');
     const descInput = document.getElementById('item_description_input');
     const costInput = document.getElementById('item_cost_price_input');
-    const priceChargedInput = document.getElementById('item_price_charged_input');
     const supplierInput = document.getElementById('item_supplier_name_input');
     const typeSelect = document.getElementById('item_type_select');
 
@@ -1042,15 +1134,6 @@ function onInventorySelect(select) {
     const cost = opt.getAttribute('data-cost');
     if (costInput && cost) {
         costInput.value = cost;
-    }
-
-    const selling = opt.getAttribute('data-selling');
-    if (priceChargedInput) {
-        if (selling && parseFloat(selling) > 0) {
-            priceChargedInput.value = selling;
-        } else if (cost && parseFloat(cost) > 0) {
-            priceChargedInput.value = cost;
-        }
     }
 
     const supplier = opt.getAttribute('data-supplier');

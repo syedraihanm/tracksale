@@ -185,46 +185,39 @@
               </li>
 
               <li>
-                {% set is_inventory = current_path.startswith('/inventory') %}
+                {% set is_inventory = current_path.startswith('/inventory') or (current_path == '/pin' and request.query_params.get('section') == 'inventory') %}
                 <a
-                  href="/inventory"
+                  href="/pin?section=inventory&amp;next=%2Finventory"
                   class="nav-link-item {{ nav_base }} {{ nav_active if is_inventory else nav_inactive }}"
-                  title="Parts Inventory"
+                  title="Parts Inventory (Shop PIN required each visit)"
                 >
                   <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_inventory else 'text-slate-300 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                   </svg>
                   <span class="sidebar-label truncate">Parts Inventory</span>
+                  <span class="sidebar-label inline-flex items-center text-slate-500" title="Shop PIN required" aria-hidden="true">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="5.25" y="10.5" width="13.5" height="10.5" rx="2" /><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 10.5V7.125a3.75 3.75 0 117.5 0V10.5m-3.75 4.125v2.25" /></svg>
+                  </span>
                 </a>
               </li>
 
               <li>
-                {% set is_suppliers = current_path.startswith('/suppliers') %}
+                {% set is_suppliers = current_path.startswith('/suppliers') or (current_path == '/pin' and request.query_params.get('section') == 'suppliers') %}
                 <a
-                  href="/suppliers"
+                  href="/pin?section=suppliers&amp;next=%2Fsuppliers"
                   class="nav-link-item {{ nav_base }} {{ nav_active if is_suppliers else nav_inactive }}"
-                  title="Suppliers & Parts Ledger"
+                  title="Suppliers & Parts Ledger (Shop PIN required each visit)"
                 >
                   <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_suppliers else 'text-slate-300 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
                   </svg>
                   <span class="sidebar-label truncate">Suppliers</span>
+                  <span class="sidebar-label inline-flex items-center text-slate-500" title="Shop PIN required" aria-hidden="true">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="5.25" y="10.5" width="13.5" height="10.5" rx="2" /><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 10.5V7.125a3.75 3.75 0 117.5 0V10.5m-3.75 4.125v2.25" /></svg>
+                  </span>
                 </a>
               </li>
 
-              <li>
-                {% set is_cash = current_path.startswith('/cash') %}
-                <a
-                  href="/cash"
-                  class="nav-link-item {{ nav_base }} {{ nav_active if is_cash else nav_inactive }}"
-                  title="Daily Cash Close"
-                >
-                  <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_cash else 'text-slate-300 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-                  </svg>
-                  <span class="sidebar-label truncate">Daily Cash Close</span>
-                </a>
-              </li>
             </ul>
           </div>
 
@@ -300,6 +293,23 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                   <span class="sidebar-label truncate">Settings & Backups</span>
+                </a>
+              </li>
+
+              <li>
+                {% set is_cash = current_path.startswith('/cash') or (current_path == '/pin' and request.query_params.get('section') == 'cash') %}
+                <a
+                  href="/pin?section=cash&amp;next=%2Fcash"
+                  class="nav-link-item {{ nav_base }} {{ nav_active if is_cash else nav_inactive }}"
+                  title="Daily Cash Close (Shop PIN required each visit)"
+                >
+                  <svg class="w-5 h-5 shrink-0 {{ 'text-white' if is_cash else 'text-slate-300 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+                  </svg>
+                  <span class="sidebar-label truncate">Daily Cash Close</span>
+                  <span class="sidebar-label inline-flex items-center text-slate-500" title="Shop PIN required" aria-hidden="true">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="5.25" y="10.5" width="13.5" height="10.5" rx="2" /><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 10.5V7.125a3.75 3.75 0 117.5 0V10.5m-3.75 4.125v2.25" /></svg>
+                  </span>
                 </a>
               </li>
             </ul>

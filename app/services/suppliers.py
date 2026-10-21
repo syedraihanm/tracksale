@@ -307,6 +307,46 @@ def record_supplier_payment(
     return payment
 
 
+def add_supplier_pending_balance(
+    db: Session,
+    supplier: Supplier | int,
+    amount: int,
+    notes: str | None = None,
+    now: datetime | None = None,
+) -> Supplier:
+    """Add an amount directly to what is pending to a supplier."""
+    current_time = now or utc_now()
+    if isinstance(supplier, int):
+        sup = get_supplier(db, supplier)
+        if not sup:
+            raise ValidationFailed("Supplier not found")
+        supplier = sup
+
+    if amount <= 0:
+        raise ValidationFailed("Amount to add must be greater than ₹0")
+    if amount > 100_000_000:
+        raise ValidationFailed("Amount exceeds maximum limit (₹10 Crore)")
+
+    previous_amount = supplier.pending_adjustment or 0
+    supplier.pending_adjustment = previous_amount + amount
+    supplier.updated_at = current_time
+    db.flush()
+
+    record_audit(
+        db=db,
+        entity=AuditEntity.SUPPLIER.value,
+        entity_id=supplier.id,
+        action=AuditAction.UPDATE.value,
+        changed_fields={
+            "pending_balance_added": {"old": previous_amount, "new": supplier.pending_adjustment},
+            "amount_added": amount,
+        },
+        reason=notes.strip() if notes and notes.strip() else "Amount added to supplier pending balance",
+        now=current_time,
+    )
+    return supplier
+
+
 def delete_supplier_payment(
     db: Session,
     payment: SupplierPayment | int,
@@ -408,7 +448,8 @@ def get_supplier_ledger(db: Session, supplier_id: int) -> dict[str, Any]:
 
     # Total bought is total parts cost
     total_bought = total_parts_cost
-    pending_payment = total_bought - total_paid
+    pending_adjustment = supplier.pending_adjustment or 0
+    pending_payment = total_bought + pending_adjustment - total_paid
 
     return {
         "supplier": supplier,
@@ -489,7 +530,8 @@ def get_all_suppliers_summary(
             or 0
         )
 
-        pending = parts_cost - paid_amount
+        pending_adjustment = sup.pending_adjustment or 0
+        pending = parts_cost + pending_adjustment - paid_amount
 
         total_bought_all += parts_cost
         total_paid_all += paid_amount

@@ -22,8 +22,8 @@
         <div class="ticket-drawer-content">
             <section class="ticket-drawer-stats" aria-label="Ticket summary">
                 <div><span>Days in shop</span><strong>{{ age_days }}</strong></div>
-                <div><span>Estimate</span><strong>{{ ticket.estimate_amount|inr if ticket.estimate_amount is not none else '-' }}</strong></div>
-                <div><span>Balance due</span><strong class="{% if balance_due > 0 %}text-amber-800{% elif balance_due < 0 %}text-emerald-700{% endif %}">{{ balance_due|inr if balance_due >= 0 else ('Credit ' ~ (balance_due|abs|inr)) }}</strong></div>
+                <div><span>Customer estimate</span><strong>{{ ticket.estimate_amount|inr if ticket.estimate_amount is not none else '-' }}</strong></div>
+                <div><span>{% if customer_total_set %}Balance due{% else %}Customer total{% endif %}</span><strong class="{% if balance_due > 0 %}text-amber-800{% elif balance_due < 0 %}text-emerald-700{% endif %}">{% if customer_total_set %}{{ balance_due|inr if balance_due >= 0 else ('Credit ' ~ (balance_due|abs|inr)) }}{% else %}Not set{% endif %}</strong></div>
             </section>
 
             <section class="ticket-drawer-section">
@@ -55,7 +55,7 @@
                 <div class="flex items-center justify-between gap-3">
                     <h3>Items</h3>
                     <div class="flex items-center gap-2">
-                        <span class="text-xs font-semibold text-slate-700">{{ items_total|inr }}</span>
+                        <span class="text-xs font-semibold text-slate-700">Cost {{ item_cost_total|inr }}</span>
                         {% if not ticket.is_deleted %}
                         <a href="/tickets/{{ ticket.id }}#ticket-line-items"
                            class="ticket-drawer-add-items"
@@ -66,7 +66,7 @@
                 {% if visible_items %}
                 <ul class="ticket-drawer-list">
                     {% for item in visible_items %}
-                    <li><span><strong>{{ item.description }}</strong><small>{{ item.type|title }}{% if item.supplier_name %} · {{ item.supplier_name }}{% endif %}</small></span><b>{{ item.price_charged|inr }}</b></li>
+                    <li><span><strong>{{ item.description }}</strong><small>{{ item.type|title }}{% if item.supplier_name %} · {{ item.supplier_name }}{% endif %}</small></span><b>{% if item.type == 'part' %}{{ item.cost_price|inr }}{% else %}-{% endif %}</b></li>
                     {% endfor %}
                 </ul>
                 {% else %}

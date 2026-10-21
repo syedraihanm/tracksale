@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Owner PIN Unlock{% endblock %}
+{% block title %}{% if section_name %}{{ section_name }} Access{% else %}Shop PIN Unlock{% endif %}{% endblock %}
 
 {% block content %}
 <div class="min-h-[75vh] flex items-center justify-center">
@@ -11,8 +11,8 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
                 </svg>
             </div>
-            <h1 class="text-xl font-bold text-slate-800">Owner Authorization</h1>
-            <p class="text-xs text-slate-500 mt-1">Enter your Shop PIN to continue</p>
+            <h1 class="text-xl font-bold text-slate-800">{% if section_name %}Unlock {{ section_name }}{% else %}Shop PIN Authorization{% endif %}</h1>
+            <p class="text-xs text-slate-500 mt-1">{% if section_name %}Enter your Shop PIN each time you open this section.{% else %}Enter your Shop PIN to continue.{% endif %}</p>
         </div>
 
         {% if error %}
@@ -24,6 +24,7 @@
         <form method="POST" action="/pin" class="space-y-4">
             <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
             <input type="hidden" name="next" value="{{ next_url|default('/') }}">
+            {% if section %}<input type="hidden" name="section" value="{{ section }}">{% endif %}
 
             <div>
                 <label for="pin" class="block text-sm font-medium text-slate-700">Shop PIN</label>

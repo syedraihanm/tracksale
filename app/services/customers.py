@@ -32,12 +32,14 @@ def get_customer_summary(db: Session, customer_id: int) -> dict[str, Any] | None
     total_spent = 0
     ticket_cards = []
     for t in non_deleted_tickets:
-        items_total, net_paid, balance_due = get_ticket_totals(t)
+        customer_total, net_paid, balance_due = get_ticket_totals(t)
         total_spent += net_paid
         under_warranty = is_under_warranty(t)
         ticket_cards.append({
             "ticket": t,
-            "items_total": items_total,
+            "items_total": customer_total,
+            "customer_total": customer_total,
+            "customer_total_set": customer_total > 0,
             "net_paid": net_paid,
             "balance_due": balance_due,
             "under_warranty": under_warranty,
