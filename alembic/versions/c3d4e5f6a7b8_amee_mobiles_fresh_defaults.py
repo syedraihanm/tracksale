@@ -8,6 +8,7 @@ Create Date: 2026-10-20
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -45,15 +46,15 @@ def upgrade() -> None:
             """
             UPDATE settings
             SET shop_name = CASE
-                    WHEN setup_completed = 0 AND shop_name = :old_shop_name THEN :new_shop_name
+                    WHEN setup_completed = FALSE AND shop_name = :old_shop_name THEN :new_shop_name
                     ELSE shop_name
                 END,
                 receipt_terms_text = CASE
-                    WHEN setup_completed = 0 AND receipt_terms_text = :old_terms THEN :new_terms
+                    WHEN setup_completed = FALSE AND receipt_terms_text = :old_terms THEN :new_terms
                     ELSE receipt_terms_text
                 END,
                 msg_template_intake = CASE
-                    WHEN setup_completed = 0 AND msg_template_intake = :old_intake THEN :new_intake
+                    WHEN setup_completed = FALSE AND msg_template_intake = :old_intake THEN :new_intake
                     ELSE msg_template_intake
                 END
             WHERE id = 1
@@ -72,4 +73,3 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Keep shop-selected settings when downgrading this data-only revision."""
-    pass

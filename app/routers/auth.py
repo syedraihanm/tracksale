@@ -21,6 +21,7 @@ from app.templating import templates
 router = APIRouter()
 settings = get_settings()
 SHOP_NAME = "AMEE MOBILES"
+DEFAULT_SHOP_PIN = "1234"
 
 SECTION_PIN_LABELS = {
     "inventory": "Parts Inventory",
@@ -44,7 +45,7 @@ def setup_get(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         request=request,
         name="auth/setup.html",
-        context={"shop_name": SHOP_NAME},
+        context={"shop_name": SHOP_NAME, "default_pin": DEFAULT_SHOP_PIN},
     )
 
 
@@ -73,7 +74,9 @@ def setup_post(
         db.add(setting)
 
     setting.shop_name = SHOP_NAME
-    shared_pin_hash = hash_secret(shop_pin)
+    # Use the requested shared default for first-run deployments. The PIN submitted
+    # by an older setup page is validated above but never replaces this default.
+    shared_pin_hash = hash_secret(DEFAULT_SHOP_PIN)
     setting.admin_password_hash = shared_pin_hash
     setting.owner_pin_hash = shared_pin_hash
     setting.setup_completed = True

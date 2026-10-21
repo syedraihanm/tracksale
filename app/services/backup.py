@@ -23,6 +23,11 @@ def get_sqlite_source_path() -> Path:
 
 def create_backup(now_dt: datetime | None = None, src_path: Path | None = None, backup_dir: Path | None = None) -> Path:
     """Create an online SQLite backup using sqlite3.backup() and prune older than 30."""
+    if not settings.uses_sqlite:
+        raise RuntimeError(
+            "File backups are available only for local SQLite databases; "
+            "use the hosted database backups for PostgreSQL."
+        )
     now = now_dt or utc_now()
     now_ist = to_ist(now)
     timestamp_str = now_ist.strftime("%Y%m%d-%H%M%S")
@@ -129,6 +134,8 @@ def prune_backups(keep: int = 30, backup_dir: Path | None = None) -> list[Path]:
 
 
 def list_backups() -> list[dict]:
+    if not settings.uses_sqlite or settings.is_vercel:
+        return []
     backup_dir = settings.backup_path
     backups = sorted(backup_dir.glob("shop-*.db"), key=os.path.getmtime, reverse=True)
     result = []

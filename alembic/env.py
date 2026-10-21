@@ -14,7 +14,8 @@ config = context.config
 current_url = config.get_main_option("sqlalchemy.url")
 if not current_url or current_url.startswith("driver://"):
     settings = get_settings()
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    # ConfigParser treats percent signs in URLs as interpolation markers.
+    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 
 
@@ -40,8 +41,24 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def run_migrations_with_connection(connection) -> None:
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        render_as_batch=True,
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
+    provided_connection = config.attributes.get("connection")
+    if provided_connection is not None:
+        run_migrations_with_connection(provided_connection)
+        return
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -49,14 +66,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            render_as_batch=True,
-        )
-
-        with context.begin_transaction():
-            context.run_migrations()
+        run_migrations_with_connection(connection)
 
 
 if context.is_offline_mode():

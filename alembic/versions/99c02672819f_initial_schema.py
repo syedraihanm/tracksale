@@ -19,6 +19,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _sqlite_trigger(statement: str) -> None:
+    if op.get_bind().dialect.name == "sqlite":
+        op.execute(statement)
+
+
 def upgrade() -> None:
     """Upgrade schema."""
     op.create_table('audit_log',
@@ -199,13 +204,13 @@ def upgrade() -> None:
             30, NULL, NULL, 'R', 1001,
             'Hi {name}, we received your {device}. Ticket {ticket_no}. Issue: {issue}. Advance paid: ₹{advance}. Thank you, {shop_name}.',
             'Hi {name}, your {device} is ready for pickup. Ticket {ticket_no}. Amount due: ₹{due}. {shop_name}',
-            0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         );
         """
     )
 
     # Integrity triggers for SQLite
-    op.execute(
+    _sqlite_trigger(
         """
         CREATE TRIGGER trg_no_delete_tickets
         BEFORE DELETE ON tickets
@@ -214,7 +219,7 @@ def upgrade() -> None:
         END;
         """
     )
-    op.execute(
+    _sqlite_trigger(
         """
         CREATE TRIGGER trg_no_delete_payments
         BEFORE DELETE ON payments
@@ -223,7 +228,7 @@ def upgrade() -> None:
         END;
         """
     )
-    op.execute(
+    _sqlite_trigger(
         """
         CREATE TRIGGER trg_no_delete_ticket_items
         BEFORE DELETE ON ticket_items
@@ -232,7 +237,7 @@ def upgrade() -> None:
         END;
         """
     )
-    op.execute(
+    _sqlite_trigger(
         """
         CREATE TRIGGER trg_no_delete_status_history
         BEFORE DELETE ON status_history
@@ -241,7 +246,7 @@ def upgrade() -> None:
         END;
         """
     )
-    op.execute(
+    _sqlite_trigger(
         """
         CREATE TRIGGER trg_no_delete_audit_log
         BEFORE DELETE ON audit_log
@@ -250,7 +255,7 @@ def upgrade() -> None:
         END;
         """
     )
-    op.execute(
+    _sqlite_trigger(
         """
         CREATE TRIGGER trg_no_update_audit_log
         BEFORE UPDATE ON audit_log
@@ -263,12 +268,12 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.execute("DROP TRIGGER IF EXISTS trg_no_update_audit_log;")
-    op.execute("DROP TRIGGER IF EXISTS trg_no_delete_audit_log;")
-    op.execute("DROP TRIGGER IF EXISTS trg_no_delete_status_history;")
-    op.execute("DROP TRIGGER IF EXISTS trg_no_delete_ticket_items;")
-    op.execute("DROP TRIGGER IF EXISTS trg_no_delete_payments;")
-    op.execute("DROP TRIGGER IF EXISTS trg_no_delete_tickets;")
+    _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_update_audit_log;")
+    _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_audit_log;")
+    _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_status_history;")
+    _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_ticket_items;")
+    _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_payments;")
+    _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_tickets;")
 
     with op.batch_alter_table('ticket_items', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_ticket_items_ticket_id'))

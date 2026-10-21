@@ -8,7 +8,7 @@
         <div class="text-center mb-6">
             <h1 class="text-2xl font-bold text-slate-800">Shop System Setup</h1>
             <p class="text-sm font-semibold text-brand-700 mt-2">{{ shop_name|default('AMEE MOBILES') }}</p>
-            <p class="text-sm text-slate-600 mt-1">Create one PIN for sign in and owner authorization</p>
+            <p class="text-sm text-slate-600 mt-1">Use the shop PIN for sign in and owner authorization</p>
         </div>
 
         {% if error %}
@@ -29,9 +29,10 @@
                        minlength="4"
                        maxlength="6"
                        autocomplete="new-password"
-                       placeholder="Example: 1234"
+                       value="{{ default_pin|default('1234') }}"
+                       readonly
                        class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 text-sm">
-                <p class="text-xs text-slate-500 mt-1">Use this same 4–6 digit PIN to sign in and authorize owner actions.</p>
+                <p class="text-xs text-slate-500 mt-1">Default PIN: 1234. Use it to sign in and authorize owner actions.</p>
             </div>
 
             <button type="submit"

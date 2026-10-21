@@ -1,7 +1,7 @@
 [project]
 name = "tracksale"
 version = "0.1.0"
-description = "Local-first Mobile Repair Shop Management System"
+description = "Mobile Repair Shop Management System"
 readme = "README.md"
 authors = [
     { name = "syedraihanm", email = "raihan87859@gmail.com" }
@@ -17,6 +17,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "openpyxl>=3.1.5",
     "pydantic-settings>=2.15.0",
+    "psycopg[binary]>=3.2.0",
     "python-multipart>=0.0.32",
     "qrcode>=8.2",
     "sqlalchemy>=2.1.4",
@@ -26,6 +27,9 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+[tool.vercel]
+entrypoint = "app.main:app"
 
 [dependency-groups]
 dev = [

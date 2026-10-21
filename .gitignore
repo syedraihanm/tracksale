@@ -24,6 +24,7 @@ htmlcov/
 .env
 .env.*
 !.env.example
+.vercel/
 
 # Local shop database and backups (created by setup/app on the shop PC)
 /data/

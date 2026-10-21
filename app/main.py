@@ -18,21 +18,30 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure backup directory exists
-    settings.backup_path.mkdir(parents=True, exist_ok=True)
-    Path("data").mkdir(parents=True, exist_ok=True)
+    scheduler = None
+    if settings.is_vercel:
+        # Vercel's function filesystem is ephemeral/read-only. Persist all shop data
+        # in PostgreSQL and run migrations under a database advisory lock.
+        from app.deployment import upgrade_database
 
-    # Startup catch-up backup check (Phase 1 / M5)
-    try:
-        from app.services.backup import (
-            run_startup_catchup_backup,
-            start_backup_scheduler,
-        )
-        run_startup_catchup_backup()
-        scheduler = start_backup_scheduler()
-    except Exception as e:
-        logger.warning("Backup initialization note: %s", e)
-        scheduler = None
+        upgrade_database()
+    else:
+        if settings.uses_sqlite:
+            settings.backup_path.mkdir(parents=True, exist_ok=True)
+            Path("data").mkdir(parents=True, exist_ok=True)
+
+        # Local/Docker SQLite installs keep the existing scheduled file backups.
+        try:
+            from app.services.backup import (
+                run_startup_catchup_backup,
+                start_backup_scheduler,
+            )
+
+            if settings.uses_sqlite:
+                run_startup_catchup_backup()
+                scheduler = start_backup_scheduler()
+        except Exception as e:
+            logger.warning("Backup initialization note: %s", e)
 
     yield
 

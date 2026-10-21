@@ -1,24 +1,34 @@
-# 📱 Mobile Repair Shop Management System
+# 📱 AMEE MOBILES Repair Shop Management System
 
-A high-performance, local-first management system designed for Indian mobile repair shops. Built with **FastAPI**, **SQLite WAL**, **Alembic**, **Jinja2**, **HTMX 2.0.3**, and **Tailwind CSS**.
+A repair shop management system for AMEE MOBILES. Built with **FastAPI**, **SQLite or PostgreSQL**, **Alembic**, **Jinja2**, **HTMX 2.0.3**, and **Tailwind CSS**.
 
 ---
 
-## Windows Shop Owner Setup (Fresh Shop)
+## Deploy on Vercel
 
-Get the project folder from GitHub, then double-click **`setup_shop_pc.bat`**. The setup installs the required runtime and dependencies, prepares an empty database, and creates the Desktop shortcut **Amee Mobiles POS** plus a Windows sign-in startup shortcut. It does not seed sample tickets or import shop data.
+The Vercel deployment uses a managed PostgreSQL database. The function filesystem is temporary, so do not use SQLite or local files for shop records in production. New tickets, payments, suppliers, and settings are saved in PostgreSQL and remain available across deployments.
 
-Double-click **Amee Mobiles POS** and complete the first-run setup. Choose one 4–6 digit Shop PIN (for example, `1234`); it is used for both sign-in and owner authorization. The shop name is prefilled as **AMEE MOBILES**. The receipt terms and WhatsApp intake message are also preconfigured.
+1. Push this repository to GitHub and import it as a Vercel project. Vercel detects the FastAPI entry point from `pyproject.toml`.
+2. Add a PostgreSQL database through a Vercel Marketplace integration (Neon or another PostgreSQL provider). Use its pooled connection string as `DATABASE_URL`.
+3. Add these Production environment variables in Vercel:
 
-## Build a Windows installer
+   ```text
+   APP_ENV=production
+   DATABASE_URL=<managed PostgreSQL connection string>
+   SECRET_KEY=<unique random secret of at least 32 characters>
+   PASSCODE_ENCRYPTION_KEY=<unique Fernet key>
+   COOKIE_SECURE=true
+   ```
 
-To build the self-contained Windows installer, install NSIS 3.13 and run `.\scripts\build_windows_exe.ps1` from PowerShell. The script bundles Python and the app into `dist\AmeeMobilesSetup.exe`. The installer creates desktop, Start menu, and silent Windows sign-in shortcuts; the shop PC does not need Python. App files are installed under the user's Local AppData Programs folder; the database, backups, logs, and generated secrets stay under `%LOCALAPPDATA%\AmeeMobiles` and are preserved by uninstall.
+   Generate application secrets locally with `uv run python scripts/gen_key.py`, then copy the printed values into Vercel. Keep them stable between deployments; changing `SECRET_KEY` signs everyone out, and changing `PASSCODE_ENCRYPTION_KEY` prevents decrypting any stored device passcodes.
 
-For transfer details and fresh-install file exclusions, see [LOCAL_SETUP_GUIDE.md](LOCAL_SETUP_GUIDE.md). Local databases, backups, and `.env` secrets are intentionally excluded from Git.
+4. Deploy. On startup, the app applies database migrations under a PostgreSQL advisory lock. The database credentials must allow schema migrations. Open the deployment and finish the short first-run screen; the initial Shop PIN is **1234** (you can change it later in Settings).
+
+Keep Production's `DATABASE_URL` connected to the same persistent database for every deployment. Give Preview deployments a separate database or disable them so preview tickets cannot mix with the shop's live records. Configure and check automatic backups with the PostgreSQL provider; the local SQLite backup screen is intentionally replaced by that provider's recovery controls.
 
 ## Local Development
 
-The project uses [`uv`](https://github.com/astral-sh/uv) and Python 3.12 or later.
+Local development continues to use SQLite by default:
 
 ```bash
 uv sync
@@ -26,7 +36,7 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-This creates a blank development database and opens the first-run setup page at **[http://127.0.0.1:8000](http://127.0.0.1:8000)**. Shop-owner setup does not use the development seed scripts.
+This creates a blank development database and opens the first-run setup page at **[http://127.0.0.1:8000](http://127.0.0.1:8000)**. The initial Shop PIN is **1234**. Shop-owner setup does not use the development seed scripts.
 
 ---
 
@@ -115,7 +125,9 @@ uv run ruff check .
 
 ---
 
-## 💾 Backups & Windows Task Scheduler
+## 💾 Local SQLite Backups & Windows Task Scheduler
+
+These file-based backup and restore instructions apply to local SQLite installs. For Vercel deployments, use the snapshot and recovery tools provided by the connected PostgreSQL service.
 
 ### Online Backups
 Backups are created using SQLite's native online backup API (`sqlite3.backup()`), which executes safely while the database is actively receiving reads and writes.

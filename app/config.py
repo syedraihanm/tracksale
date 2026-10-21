@@ -1,8 +1,9 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 
 from cryptography.fernet import Fernet
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 INSECURE_DEFAULT_KEYS: set[str] = {
@@ -26,9 +27,28 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_postgres_url(cls, value: str) -> str:
+        # Marketplace providers commonly expose postgres:// or postgresql:// URLs.
+        if isinstance(value, str):
+            if value.startswith("postgres://"):
+                return "postgresql+psycopg://" + value.removeprefix("postgres://")
+            if value.startswith("postgresql://"):
+                return "postgresql+psycopg://" + value.removeprefix("postgresql://")
+        return value
+
     @property
     def is_production(self) -> bool:
         return self.APP_ENV.lower() == "production"
+
+    @property
+    def is_vercel(self) -> bool:
+        return bool(os.environ.get("VERCEL"))
+
+    @property
+    def uses_sqlite(self) -> bool:
+        return self.DATABASE_URL.startswith("sqlite:")
 
     @property
     def backup_path(self) -> Path:
@@ -38,6 +58,14 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_secrets(self) -> "Settings":
+        if self.is_vercel:
+            if not self.is_production:
+                raise ValueError("Set APP_ENV=production in the Vercel project environment.")
+            if not self.DATABASE_URL.startswith("postgresql+psycopg://"):
+                raise ValueError("Vercel requires a persistent PostgreSQL DATABASE_URL; SQLite is not supported there.")
+            if not self.COOKIE_SECURE:
+                raise ValueError("Set COOKIE_SECURE=true for the HTTPS Vercel deployment.")
+
         try:
             Fernet(self.PASSCODE_ENCRYPTION_KEY.encode())
         except Exception as e:

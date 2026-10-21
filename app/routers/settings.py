@@ -44,6 +44,7 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
             "setting": setting,
             "shop_name": setting.shop_name if setting else "Mobile Repair Shop",
             "backups": backups,
+            "is_hosted_database": not app_settings.uses_sqlite,
         },
     )
 
@@ -51,6 +52,8 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
 @router.post("/backup/run", dependencies=[Depends(verify_csrf)])
 @router.post("/backup-now", dependencies=[Depends(verify_csrf)], include_in_schema=False)
 def run_backup_now():
+    if app_settings.is_vercel or not app_settings.uses_sqlite:
+        raise HTTPException(status_code=404, detail="File backups are not available for hosted PostgreSQL shops")
     try:
         create_backup()
     except Exception as e:
@@ -60,6 +63,8 @@ def run_backup_now():
 
 @router.get("/backup/download")
 def download_backup(filename: str = Query(...)):
+    if app_settings.is_vercel or not app_settings.uses_sqlite:
+        raise HTTPException(status_code=404, detail="File backups are not available for hosted PostgreSQL shops")
     # Validate filename to prevent path traversal
     safe_name = Path(filename).name
     target_path = app_settings.backup_path / safe_name

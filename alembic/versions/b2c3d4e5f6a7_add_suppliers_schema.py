@@ -19,6 +19,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _sqlite_trigger(statement: str) -> None:
+    if op.get_bind().dialect.name == "sqlite":
+        op.execute(statement)
+
+
 def upgrade() -> None:
     """Upgrade schema to add suppliers and supplier_payments tables, and link to ticket_items and inventory_items."""
     bind = op.get_bind()
@@ -45,7 +50,7 @@ def upgrade() -> None:
             batch_op.create_index("ix_suppliers_is_deleted", ["is_deleted"], unique=False)
 
     # 2. Add anti-delete trigger on suppliers
-    op.execute(
+    _sqlite_trigger(
         """
         CREATE TRIGGER IF NOT EXISTS trg_no_delete_suppliers
         BEFORE DELETE ON suppliers
@@ -86,7 +91,7 @@ def upgrade() -> None:
             batch_op.create_index("ix_supplier_payments_is_deleted", ["is_deleted"], unique=False)
 
     # 4. Add anti-delete trigger on supplier_payments
-    op.execute(
+    _sqlite_trigger(
         """
         CREATE TRIGGER IF NOT EXISTS trg_no_delete_supplier_payments
         BEFORE DELETE ON supplier_payments
@@ -99,7 +104,7 @@ def upgrade() -> None:
     # 5. Add supplier_id to ticket_items if not already present
     ticket_item_cols = [c["name"] for c in inspector.get_columns("ticket_items")]
     if "supplier_id" not in ticket_item_cols:
-        op.execute("DROP TRIGGER IF EXISTS trg_no_delete_ticket_items;")
+        _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_ticket_items;")
         with op.batch_alter_table("ticket_items", schema=None) as batch_op:
             batch_op.add_column(sa.Column("supplier_id", sa.Integer(), nullable=True))
             batch_op.create_foreign_key(
@@ -111,7 +116,7 @@ def upgrade() -> None:
             )
             batch_op.create_index("ix_ticket_items_supplier_id", ["supplier_id"], unique=False)
 
-        op.execute(
+        _sqlite_trigger(
             """
             CREATE TRIGGER IF NOT EXISTS trg_no_delete_ticket_items
             BEFORE DELETE ON ticket_items
@@ -125,7 +130,7 @@ def upgrade() -> None:
     if inspector.has_table("inventory_items"):
         inv_cols = [c["name"] for c in inspector.get_columns("inventory_items")]
         if "supplier_id" not in inv_cols:
-            op.execute("DROP TRIGGER IF EXISTS trg_no_delete_inventory_items;")
+            _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_inventory_items;")
             with op.batch_alter_table("inventory_items", schema=None) as batch_op:
                 batch_op.add_column(sa.Column("supplier_id", sa.Integer(), nullable=True))
                 batch_op.create_foreign_key(
@@ -137,7 +142,7 @@ def upgrade() -> None:
                 )
                 batch_op.create_index("ix_inventory_items_supplier_id", ["supplier_id"], unique=False)
 
-            op.execute(
+            _sqlite_trigger(
                 """
                 CREATE TRIGGER IF NOT EXISTS trg_no_delete_inventory_items
                 BEFORE DELETE ON inventory_items
@@ -150,19 +155,19 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.execute("DROP TRIGGER IF EXISTS trg_no_delete_supplier_payments;")
-    op.execute("DROP TRIGGER IF EXISTS trg_no_delete_suppliers;")
+    _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_supplier_payments;")
+    _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_suppliers;")
 
     bind = op.get_bind()
     inspector = sa.inspect(bind)
 
     if inspector.has_table("inventory_items"):
-        op.execute("DROP TRIGGER IF EXISTS trg_no_delete_inventory_items;")
+        _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_inventory_items;")
         with op.batch_alter_table("inventory_items", schema=None) as batch_op:
             batch_op.drop_index("ix_inventory_items_supplier_id")
             batch_op.drop_constraint("fk_inventory_items_supplier_id", type_="foreignkey")
             batch_op.drop_column("supplier_id")
-        op.execute(
+        _sqlite_trigger(
             """
             CREATE TRIGGER IF NOT EXISTS trg_no_delete_inventory_items
             BEFORE DELETE ON inventory_items
@@ -172,12 +177,12 @@ def downgrade() -> None:
             """
         )
 
-    op.execute("DROP TRIGGER IF EXISTS trg_no_delete_ticket_items;")
+    _sqlite_trigger("DROP TRIGGER IF EXISTS trg_no_delete_ticket_items;")
     with op.batch_alter_table("ticket_items", schema=None) as batch_op:
         batch_op.drop_index("ix_ticket_items_supplier_id")
         batch_op.drop_constraint("fk_ticket_items_supplier_id", type_="foreignkey")
         batch_op.drop_column("supplier_id")
-    op.execute(
+    _sqlite_trigger(
         """
         CREATE TRIGGER IF NOT EXISTS trg_no_delete_ticket_items
         BEFORE DELETE ON ticket_items

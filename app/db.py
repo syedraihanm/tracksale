@@ -42,10 +42,15 @@ class UTCDateTime(TypeDecorator):
         return value.replace(tzinfo=UTC)
 
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args={"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {},
-)
+engine_options = {
+    "connect_args": {"check_same_thread": False} if settings.uses_sqlite else {},
+    "pool_pre_ping": True,
+}
+if not settings.uses_sqlite:
+    # Keep a small per-instance pool for Vercel's request-driven runtime.
+    engine_options.update(pool_size=2, max_overflow=0, pool_timeout=20)
+
+engine = create_engine(settings.DATABASE_URL, **engine_options)
 
 
 @event.listens_for(engine, "connect")
