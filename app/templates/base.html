@@ -5,39 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}{{ shop_name | default('TrackSale POS') }}{% endblock %}</title>
 
-  <!-- Google Fonts: Inter (UI) & JetBrains Mono (Ticket IDs, IMEI, Currency) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
-
-  <!-- Tailwind CSS Play CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          },
-          colors: {
-            brand: {
-              50: '#eef2ff',
-              100: '#e0e7ff',
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
-              900: '#312e81',
-            }
-          }
-        }
-      }
-    };
-  </script>
-
-  <!-- HTMX 2.0.3 & Chart.js 4.x -->
-  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <!-- Local styles and scripts keep the desktop app usable without internet access. -->
+  <link rel="stylesheet" href="/static/tailwind.css?v=1.0" />
+  <script src="/static/vendor/htmx.min.js?v=2.0.3"></script>
 
   <!-- Cache-busted Custom Stylesheet -->
   <link rel="stylesheet" href="/static/app.css?v=3.5" />

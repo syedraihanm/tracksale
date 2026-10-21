@@ -5,6 +5,14 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $pythonPath = Join-Path $projectRoot '.venv\Scripts\python.exe'
 $uvCommand = Get-Command 'uv.exe' -ErrorAction SilentlyContinue
+$npxCommand = Get-Command 'npx.cmd' -ErrorAction SilentlyContinue
+
+if ($npxCommand) {
+    & (Join-Path $PSScriptRoot 'build_styles.ps1')
+    if ($LASTEXITCODE -ne 0) { throw "Tailwind CSS build failed with exit code $LASTEXITCODE." }
+} elseif (-not (Test-Path -LiteralPath (Join-Path $projectRoot 'app\static\tailwind.css') -PathType Leaf)) {
+    throw 'The compiled local stylesheet is missing. Install Node.js and npm, then rerun the build.'
+}
 
 if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
     if (-not $uvCommand) {
